@@ -13,25 +13,27 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   </head>
   <body class="font-sans text-fg">
+    <!-- Text is filled in from src/i18n at startup: data-i18n sets text, data-i18n-label sets aria-label + title. -->
     <div id="game"></div>
 
     <header
       id="chrome"
       class="chrome pointer-events-none fixed inset-x-0 top-0 z-30 flex items-start gap-3 bg-gradient-to-b from-black/75 to-transparent px-[max(0.75rem,env(safe-area-inset-left))] pb-10 pt-[max(0.75rem,env(safe-area-inset-top))]"
     >
-      <a id="back" href="/" class="chrome-button pointer-events-auto" data-icon="arrowLeft">Library</a>
+      <a id="back" href="/" class="chrome-button pointer-events-auto" data-icon="arrowLeft"><span data-i18n="player.library"></span></a>
       <div class="min-w-0 pt-1">
         <p id="title" class="type-wide truncate text-[0.95rem] text-white"></p>
         <p id="subtitle" class="truncate text-xs text-white/70"></p>
       </div>
       <div class="pointer-events-auto ml-auto flex shrink-0 items-center gap-2">
-        <span id="pad" hidden class="chrome-button !px-2.5" title="Controller connected">
+        <span id="pad" hidden class="chrome-button !px-2.5" data-i18n-label="player.controllerConnected">
           <span class="size-2 rounded-full bg-ok shadow-[0_0_8px_var(--color-ok)]"></span>
           <span data-icon="gamepad"></span>
-          <span class="sr-only">Controller connected</span>
         </span>
-        <button id="saves-toggle" type="button" class="chrome-button" data-icon="save" aria-expanded="false" aria-controls="saves" disabled>Saves</button>
-        <button id="fullscreen" type="button" class="chrome-button !px-2.5" aria-label="Full screen" title="Full screen" data-icon="maximize"></button>
+        <button id="saves-toggle" type="button" class="chrome-button" data-icon="save" aria-expanded="false" aria-controls="saves" disabled>
+          <span data-i18n="player.saves"></span>
+        </button>
+        <button id="fullscreen" type="button" class="chrome-button !px-2.5" data-i18n-label="player.fullscreen" data-icon="maximize"></button>
       </div>
     </header>
 
@@ -42,27 +44,27 @@
       class="sheet-in fixed inset-y-0 right-0 z-40 flex w-[min(25rem,100vw)] flex-col border-l border-line bg-surface/95 text-fg shadow-2xl backdrop-blur-xl"
     >
       <div class="flex items-center justify-between px-5 pb-3 pt-[max(1rem,env(safe-area-inset-top))]">
-        <h2 id="saves-title" class="type-wide text-lg">Save states</h2>
-        <button id="saves-close" type="button" class="btn-icon" aria-label="Close saves" data-icon="x"></button>
+        <h2 id="saves-title" class="type-wide text-lg" data-i18n="player.savesTitle"></h2>
+        <button id="saves-close" type="button" class="btn-icon" data-i18n-label="player.closeSaves" data-icon="x"></button>
       </div>
-      <p class="px-5 text-sm leading-relaxed text-muted">
-        The game pauses while this panel is open. Saves stay in this browser; export them to keep a copy.
-      </p>
+      <p class="px-5 text-sm leading-relaxed text-muted" data-i18n="player.savesIntro"></p>
       <ol id="slots" class="grid flex-1 auto-rows-min grid-cols-2 gap-3 overflow-y-auto px-5 py-4 sm:grid-cols-3"></ol>
       <div class="space-y-3 border-t border-line px-5 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 text-sm">
-        <div class="flex items-center gap-2">
-          <label for="import-slot" class="text-muted">Import a state into</label>
+        <div class="flex flex-wrap items-center gap-2">
+          <label for="import-slot" class="text-muted" data-i18n="player.importInto"></label>
           <select id="import-slot" class="field h-9 min-h-0 text-sm"></select>
-          <label class="btn btn-secondary ml-auto min-h-9 cursor-pointer px-3 text-sm">
-            <span data-icon="upload"></span>Choose file
+          <label class="btn btn-secondary ml-auto min-h-9 cursor-pointer px-3 text-sm" data-icon="upload">
+            <span data-i18n="player.chooseFile"></span>
             <input id="import-state" type="file" class="sr-only" />
           </label>
         </div>
         <div class="flex items-center gap-2">
-          <span class="text-muted">Battery save</span>
-          <button id="export-battery" type="button" class="btn btn-quiet ml-auto min-h-9 text-sm" data-icon="download">Export</button>
-          <label class="btn btn-quiet min-h-9 cursor-pointer text-sm">
-            <span data-icon="upload"></span>Import
+          <span class="text-muted" data-i18n="player.batterySave"></span>
+          <button id="export-battery" type="button" class="btn btn-quiet ml-auto min-h-9 text-sm" data-icon="download">
+            <span data-i18n="player.export"></span>
+          </button>
+          <label class="btn btn-quiet min-h-9 cursor-pointer text-sm" data-icon="upload">
+            <span data-i18n="player.import"></span>
             <input id="import-battery" type="file" class="sr-only" />
           </label>
         </div>
@@ -74,7 +76,7 @@
         <h1 id="notice-title" class="type-display text-[1.75rem]"></h1>
         <p id="notice-body" class="mt-4 leading-relaxed text-muted"></p>
         <div class="mt-7 flex flex-wrap justify-center gap-2">
-          <a id="notice-primary" class="btn btn-primary" href="/">Back to library</a>
+          <a id="notice-primary" class="btn btn-primary" href="/"></a>
         </div>
       </div>
     </section>
