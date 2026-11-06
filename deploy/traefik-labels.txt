@@ -1,0 +1,7 @@
+# Traefik (Docker/Podman provider) labels. Add to the Quadlet [Container] section as Label=...
+# or to a compose file. Traefik forwards the app's Cross-Origin-* headers unchanged.
+traefik.enable=true
+traefik.http.routers.retroshelf.rule=Host(`games.example.com`)
+traefik.http.routers.retroshelf.entrypoints=websecure
+traefik.http.routers.retroshelf.tls.certresolver=letsencrypt
+traefik.http.services.retroshelf.loadbalancer.server.port=8080
