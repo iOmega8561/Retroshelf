@@ -1,0 +1,61 @@
+# syntax=docker/dockerfile:1.7
+#
+# Retroshelf, light image: EmulatorJS is loaded by each player's browser from the official CDN
+# (cdn.emulatorjs.org/stable). Smallest image; players need internet access.
+#   podman build -f Dockerfile.light -t localhost/retroshelf:light .
+# Full image with EmulatorJS bundled inside: Dockerfile
+#
+ARG NODE_VERSION=22
+
+# ---------- Stage 1: web UI (Vite + React + Tailwind, TypeScript) ----------
+FROM docker.io/library/node:${NODE_VERSION}-alpine AS web
+WORKDIR /src/web
+COPY web/package.json web/package-lock.json ./
+RUN npm ci --no-audit --no-fund
+COPY shared/ /src/shared/
+COPY web/ ./
+RUN npm run build
+
+# ---------- Stage 2: server (Express, TypeScript) ----------
+FROM docker.io/library/node:${NODE_VERSION}-alpine AS server
+WORKDIR /src/server
+COPY server/package.json server/package-lock.json ./
+RUN npm ci --no-audit --no-fund
+COPY shared/ /src/shared/
+COPY server/ ./
+RUN npm run build && npm prune --omit=dev
+
+# ---------- Stage 3: runtime ----------
+FROM docker.io/library/node:${NODE_VERSION}-alpine AS runtime
+
+LABEL org.opencontainers.image.title="Retroshelf" \
+      org.opencontainers.image.description="Self-hosted retro game library with in-browser play via EmulatorJS" \
+      org.opencontainers.image.source="https://example.invalid/retroshelf"
+
+# The base image ships a "node" user on 1000:1000; replace it with an explicit, unprivileged
+# system account so the UID/GID contract is visible here rather than inherited.
+RUN deluser --remove-home node 2>/dev/null || true; \
+    delgroup node 2>/dev/null || true; \
+    addgroup -S -g 1000 retroshelf && \
+    adduser -S -D -H -u 1000 -G retroshelf -h /app -s /sbin/nologin retroshelf
+
+ENV NODE_ENV=production \
+    HOST=0.0.0.0 \
+    PORT=8080 \
+    LIBRARY_DIR=/library \
+    WEB_DIR=/app/web
+
+WORKDIR /app
+# Application files stay root-owned and read-only for the runtime user: the process never
+# writes anywhere, so the container runs with a read-only root filesystem.
+COPY --from=server /src/server/package.json ./package.json
+COPY --from=server /src/server/node_modules ./node_modules
+COPY --from=server /src/server/dist ./dist
+COPY --from=web /src/web/dist ./web
+
+USER 1000:1000
+EXPOSE 8080
+STOPSIGNAL SIGTERM
+# Honoured by Docker and by Podman when building with --format docker; Quadlet uses HealthCmd=.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 CMD ["node", "/app/dist/healthcheck.js"]
+CMD ["node", "dist/index.js"]

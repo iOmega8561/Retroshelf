@@ -157,6 +157,8 @@ export interface HealthPayload {
   systems: number;
   scannedAt?: string;
   uptimeSeconds: number;
+  /** Where the player loads EmulatorJS from. */
+  emulatorjs: 'cdn' | 'bundled';
 }
 
 export interface ScanResponse {

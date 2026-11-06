@@ -42,6 +42,7 @@ export function apiRouter(config: Config, catalog: Catalog): Router {
       systems: catalog.systemCount,
       scannedAt: catalog.scannedAt?.toISOString(),
       uptimeSeconds: Math.round((Date.now() - startedAt) / 1000),
+      emulatorjs: config.ejsOrigin ? 'cdn' : 'bundled',
     };
     res.setHeader('Cache-Control', 'no-store');
     res.json(body);

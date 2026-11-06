@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import express, { type ErrorRequestHandler, type Express, type RequestHandler } from 'express';
-import type { Config } from '../config.js';
+import { EJS_LOCAL_MOUNT, type Config } from '../config.js';
 import type { Catalog } from '../library/catalog.js';
 import type { Logger } from '../logger.js';
 import { apiRouter } from './routes/api.js';
@@ -100,7 +100,7 @@ async function mountWebUi(app: Express, config: Config, log: Logger): Promise<vo
   // Client-side routes: any other GET that wants HTML gets the app shell.
   const shell = sendPage(appPage);
   app.use((req, res, next) => {
-    if ((req.method !== 'GET' && req.method !== 'HEAD') || /^\/(api|files|media|assets)\//.test(req.path) || !req.accepts('html')) {
+    if ((req.method !== 'GET' && req.method !== 'HEAD') || /^\/(api|files|media|assets|emulatorjs)\//.test(req.path) || !req.accepts('html')) {
       next();
       return;
     }
@@ -120,6 +120,29 @@ export async function createApp(config: Config, catalog: Catalog, log: Logger): 
   app.use('/api', apiRouter(config, catalog));
   app.use('/files', filesRouter(config, catalog));
   app.use('/media', mediaRouter(config, catalog));
+  if (config.ejsLocalDir) {
+    const stat = await fs.stat(path.join(config.ejsLocalDir, 'loader.js')).catch(() => null);
+    if (!stat?.isFile()) throw new Error(`EJS_LOCAL_DIR does not contain an EmulatorJS data folder (no loader.js): ${config.ejsLocalDir}`);
+    const version = await fs
+      .readFile(path.join(config.ejsLocalDir, 'version.json'), 'utf8')
+      .then((text) => (JSON.parse(text) as { version?: string }).version)
+      .catch(() => undefined);
+    log.info('serving bundled EmulatorJS', { version: version ?? 'unknown', path: EJS_LOCAL_MOUNT });
+    // Bundled EmulatorJS: versioned with the image, so a day of caching plus revalidation is safe.
+    app.use(
+      EJS_LOCAL_MOUNT.replace(/\/$/, ''),
+      express.static(config.ejsLocalDir, {
+        index: false,
+        redirect: false,
+        fallthrough: false,
+        maxAge: '1d',
+        setHeaders: (res, filePath) => {
+          if (filePath.endsWith('.json')) res.setHeader('Cache-Control', 'no-cache');
+        },
+      }),
+    );
+  }
+
   const manifest = manifestHandler(config, catalog);
   app.get('/manifest.json', manifest);
   app.get('/manifest.webmanifest', manifest);
