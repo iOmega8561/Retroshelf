@@ -14,6 +14,8 @@ export interface Config {
   webDir: string;
   /** EmulatorJS data folder (CDN by default). Always ends with `/`. */
   ejsDataPath: string;
+  /** Local EmulatorJS `data/` folder served at EJS_LOCAL_MOUNT (the full image sets this). */
+  ejsLocalDir: string | null;
   /** Origin of ejsDataPath for CSP, or null when served from this origin. */
   ejsOrigin: string | null;
   ejsCacheLimitBytes: number;
@@ -84,9 +86,14 @@ function parseTrustProxy(raw: string): string | boolean {
   return raw; // e.g. "loopback", "10.0.0.0/8", "1"
 }
 
+/** URL path where a bundled EmulatorJS (EJS_LOCAL_DIR) is served. */
+export const EJS_LOCAL_MOUNT = '/emulatorjs/data/';
+
 export function loadConfig(): Config {
   const libraryDir = path.resolve(str('LIBRARY_DIR', '/library'));
-  const ejs = parseEjsPath(str('EJS_DATA_PATH', 'https://cdn.emulatorjs.org/stable/data/'));
+  const ejsLocalDir = process.env.EJS_LOCAL_DIR?.trim() ? path.resolve(process.env.EJS_LOCAL_DIR.trim()) : null;
+  // A bundled copy is used by default when present; EJS_DATA_PATH can still point elsewhere.
+  const ejs = parseEjsPath(str('EJS_DATA_PATH', ejsLocalDir ? EJS_LOCAL_MOUNT : 'https://cdn.emulatorjs.org/stable/data/'));
   const scanToken = process.env.SCAN_TOKEN?.trim() || null;
 
   return {
@@ -98,6 +105,7 @@ export function loadConfig(): Config {
     biosDir: path.resolve(str('BIOS_DIR', path.join(libraryDir, 'bios'))),
     webDir: path.resolve(str('WEB_DIR', path.join(process.cwd(), '..', 'web', 'dist'))),
     ejsDataPath: ejs.dataPath,
+    ejsLocalDir,
     ejsOrigin: ejs.origin,
     ejsCacheLimitBytes: int('EJS_CACHE_LIMIT_MB', 1024, 0, 16384) * 1024 * 1024,
     coep: oneOf<CoepMode>('COEP', 'require-corp', ['require-corp', 'credentialless', 'off']),

@@ -356,6 +356,33 @@ describe('path safety over HTTP', () => {
   });
 });
 
+describe('bundled EmulatorJS', () => {
+  it('serves a local EmulatorJS copy and points the player at it', async () => {
+    const ejsDir = path.join(root, 'ejs', 'data');
+    fs.mkdirSync(ejsDir, { recursive: true });
+    fs.writeFileSync(path.join(ejsDir, 'loader.js'), '// loader');
+    process.env.EJS_LOCAL_DIR = ejsDir;
+    const config = loadConfig();
+    delete process.env.EJS_LOCAL_DIR;
+    const log = createLogger('error');
+    const local = new Catalog(config, log);
+    const app = await createApp(config, local, log);
+    await local.scan('test');
+    const instance = app.listen(0, '127.0.0.1');
+    await new Promise((r) => instance.once('listening', r));
+    const at = `http://127.0.0.1:${(instance.address() as AddressInfo).port}`;
+    try {
+      assert.equal(await (await fetch(`${at}/emulatorjs/data/loader.js`)).text(), '// loader');
+      assert.equal(((await (await fetch(`${at}/api/health`)).json()) as { emulatorjs: string }).emulatorjs, 'bundled');
+      const detail = (await (await fetch(`${at}/api/games/${gameByName('Advance Wars').id}`)).json()) as GameDetail;
+      assert.equal(detail.play?.dataPath, '/emulatorjs/data/');
+      assert.equal((await fetch(`${at}/emulatorjs/data/../../secret.txt`)).status, 404);
+    } finally {
+      instance.close();
+    }
+  });
+});
+
 describe('api surface', () => {
   it('sends isolation and hardening headers', async () => {
     const res = await raw('GET', '/api/health');

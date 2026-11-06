@@ -17,14 +17,20 @@ async function main(): Promise<void> {
 
   const log = createLogger(config.logLevel);
   const catalog = new Catalog(config, log);
-  const app = await createApp(config, catalog, log);
+  let app;
+  try {
+    app = await createApp(config, catalog, log);
+  } catch (error) {
+    log.error('startup failed', { error: error as Error });
+    process.exit(1);
+  }
 
   const server = app.listen(config.port, config.host, () => {
     log.info('listening', {
       address: `http://${config.host}:${config.port}`,
       library: config.libraryDir,
       coep: config.coep,
-      emulatorjs: config.ejsDataPath,
+      emulatorjs: config.ejsLocalDir ? `bundled (${config.ejsLocalDir})` : config.ejsDataPath,
     });
   });
   // Outlive typical reverse-proxy idle timeouts so pooled upstream connections aren't reset.

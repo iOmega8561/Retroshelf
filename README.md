@@ -7,6 +7,7 @@ One rootless container, no database, no third-party APIs. The catalog comes from
 ## Contents
 
 - [Quick start](#quick-start)
+- [Two images: full and light](#two-images-full-and-light)
 - [Library layout](#library-layout)
 - [Game folders, updates and DLC](#game-folders-updates-and-dlc)
 - [Systems](#systems)
@@ -33,6 +34,29 @@ podman run -d --name retroshelf \
 ```
 
 Open <http://localhost:8080>. Over plain HTTP from another device on your LAN, games still run, but browsers disable controllers and the PSP and DOS cores. Put Retroshelf behind HTTPS for those (see below).
+
+## Two images: full and light
+
+| | `Dockerfile` (tag `latest`) | `Dockerfile.light` (tag `light`) |
+|---|---|---|
+| EmulatorJS | Bundled: the latest stable release with every core, served by Retroshelf | Loaded by each browser from `cdn.emulatorjs.org/stable` |
+| Image size | About 300 MB larger | Smallest |
+| Players need internet | No; works on an isolated LAN | Yes, to reach the CDN |
+| CSP for the player | Same-origin only | Same-origin plus the CDN |
+
+```sh
+podman build -t localhost/retroshelf:latest .                       # full
+podman build -f Dockerfile.light -t localhost/retroshelf:light .    # light
+```
+
+**Choosing the EmulatorJS version (full image).**
+
+- **Default:** the full image downloads the official release archive (`cdn.emulatorjs.org/releases/<version>.7z`) of whatever `stable/data/version.json` reports at build time.
+- **Pin a version:** `--build-arg EMULATORJS_VERSION=4.2.3`.
+- **Verify the archive:** add `--build-arg EMULATORJS_SHA256=<sha256>`. The build log prints the checksum of every archive it downloads.
+- **What ships:** EmulatorJS is GPL-3.0, and its licence ships at `/app/emulatorjs/LICENSE`.
+
+**Switching sources without rebuilding.** The full image sets `EJS_LOCAL_DIR=/app/emulatorjs/data`, and Retroshelf serves that folder at `/emulatorjs/data/`. `/api/health` reports which source is in use (`"emulatorjs": "bundled"` or `"cdn"`). To make the full image use the CDN anyway, set `EJS_DATA_PATH=https://cdn.emulatorjs.org/stable/data/`.
 
 ## Library layout
 
@@ -231,7 +255,8 @@ All settings are environment variables. Invalid values stop the server at startu
 | `LIBRARY_DIR` | `/library` | Library root. |
 | `ROMS_DIR` | `$LIBRARY_DIR/roms` | Override the ROM root. |
 | `BIOS_DIR` | `$LIBRARY_DIR/bios` | Override the BIOS root. |
-| `EJS_DATA_PATH` | `https://cdn.emulatorjs.org/stable/data/` | EmulatorJS data folder. Point it at a self-hosted copy (a URL, or a path like `/emulatorjs/data/`) to pin a version. The player page's CSP follows this origin. |
+| `EJS_DATA_PATH` | CDN, or `/emulatorjs/data/` when `EJS_LOCAL_DIR` is set | EmulatorJS data folder: a URL or a path on this server. The player page's CSP follows this origin. |
+| `EJS_LOCAL_DIR` | unset (`/app/emulatorjs/data` in the full image) | Local EmulatorJS `data/` folder to serve at `/emulatorjs/data/`. Startup fails with a clear message if it holds no `loader.js`. |
 | `EJS_CACHE_LIMIT_MB` | `1024` | Largest ROM EmulatorJS caches in the browser. |
 | `COEP` | `require-corp` | `require-corp`, `credentialless` or `off`. `off` disables PSP and DOS. |
 | `RESCAN_INTERVAL_MINUTES` | `0` | Rescan periodically; `0` disables it. |
@@ -260,7 +285,7 @@ Retroshelf asks the browser for persistent storage the first time you save, so t
 - **Whitelisted files.** Only files the scanner indexed can be served: ROM files that belong to a game, media referenced by a game, and files under `bios/`. A URL can't name any other file.
 - **Path checks.** Every URL segment is validated (no `..`, no dotfiles, no separators, no control characters), and the resolved path must stay inside its root. Without `FOLLOW_SYMLINKS`, the real path must too.
 - **Untrusted references.** Paths found inside gamelists, cue sheets and playlists get the same checks, so a crafted `.cue` can't pull in files from elsewhere. User-supplied SVG is never served.
-- **Content Security Policy.** The library page allows same-origin content only. The player page also allows the EmulatorJS origin, `blob:` scripts and WebAssembly, which the emulator needs.
+- **Content Security Policy.** The library page allows same-origin content only. The player page also allows `blob:` scripts and WebAssembly, which the emulator needs, plus the CDN's origin in the light image. With the full image the player is same-origin only.
 - **Response headers.** Responses also carry `nosniff`, `X-Frame-Options`, `Referrer-Policy` and a Permissions-Policy that allows gamepads and fullscreen for this site only.
 - **Rescans.** Rescans are single-flight and rate-limited, refuse cross-site requests, and can require a token.
 - **Container.** The container runs as UID/GID 1000 with a read-only root filesystem. The library mount can be (and should be) read-only too.
@@ -300,6 +325,8 @@ web/src/
   play/              player page (framework-free TypeScript + EmulatorJS)
   sw/sw.ts           service worker
 deploy/              Quadlet unit, Caddy / Nginx / Traefik examples
+Dockerfile           full image (EmulatorJS bundled)
+Dockerfile.light     light image (EmulatorJS from the CDN)
 ```
 
 ## Known limits
@@ -307,6 +334,7 @@ deploy/              Quadlet unit, Caddy / Nginx / Traefik examples
 - EmulatorJS downloads a whole ROM before starting. Byte ranges are fully supported for downloads and resumable transfers, but the emulator itself doesn't use them.
 - Requests with several byte ranges at once get the full file (allowed by RFC 9110); single ranges get 206.
 - Disc sets streamed *into the emulator* use classic ZIP, so a set over 4 GB can't be played in the browser (browsers couldn't hold it in memory anyway); convert it to CHD or PBP. Downloads have no such limit.
+- On `localhost`, EmulatorJS checks its CDN for updates; with the bundled copy, the player's CSP blocks that request (it shows as a console warning). On any other hostname the check doesn't run.
 - Controllers need HTTPS (or localhost) and appear after their first button press. In the library, the D-pad moves between games, A opens, B goes back, LB/RB switch systems and Start plays.
 - Some browsers keep game audio muted until the first key press or tap on the player page.
 - Folders that ES-DE treats as a single game (for example a `Game.ps3` folder) aren't supported; only files are listed as games.

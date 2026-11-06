@@ -17,6 +17,8 @@ declare const __BUILD_ID__: string;
 const SHELL_CACHE = `rs-shell-${__BUILD_ID__}`;
 const DATA_CACHE = 'rs-data-v1';
 const MEDIA_CACHE = 'rs-media-v1';
+/** Bundled EmulatorJS scripts, styles and translations (cores are cached by EmulatorJS itself). */
+const EMULATOR_CACHE = 'rs-emulatorjs-v1';
 const MEDIA_LIMIT = 1500;
 const DATA_LIMIT = 400;
 const PAGES = ['/', '/play'];
@@ -159,6 +161,8 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(cacheFirst(request, SHELL_CACHE));
   } else if (url.pathname === '/api/library' || url.pathname.startsWith('/api/games/')) {
     event.respondWith(networkFirst(event, DATA_CACHE, DATA_LIMIT));
+  } else if (url.pathname.startsWith('/emulatorjs/') && !url.pathname.endsWith('.data')) {
+    event.respondWith(staleWhileRevalidate(event, EMULATOR_CACHE));
   } else if (url.pathname.startsWith('/media/')) {
     event.respondWith(staleWhileRevalidate(event, MEDIA_CACHE));
   } else if (STATIC.includes(url.pathname) || url.pathname.startsWith('/icons/')) {
