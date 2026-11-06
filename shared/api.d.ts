@@ -133,7 +133,10 @@ export interface GameMedia {
 
 export interface GameDetail extends GameSummary {
   systemName: string;
+  /** Default description (`<desc>`). */
   description?: string;
+  /** Translations from `<desc lang="…">`, keyed by base language ("en", "it"). */
+  descriptions?: Record<string, string>;
   media: GameMedia;
   /** Single best download: the ROM itself, or a zip of the disc set. */
   download?: FileLink;
