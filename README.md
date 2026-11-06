@@ -9,7 +9,8 @@ One rootless container, no database, no third-party APIs. The catalog comes from
 - [Quick start](#quick-start)
 - [Library layout](#library-layout)
 - [Systems](#systems)
-- [HTTPS, PSP and cross-origin isolation](#https-psp-and-cross-origin-isolation)
+- [HTTPS, controllers and PSP](#https-controllers-and-psp)
+- [Languages](#languages)
 - [Running with Quadlet](#running-with-quadlet)
 - [Configuration](#configuration)
 - [Saves and client data](#saves-and-client-data)
@@ -30,7 +31,7 @@ podman run -d --name retroshelf \
   localhost/retroshelf:latest
 ```
 
-Open <http://localhost:8080>. Everything except PSP and DOS also works over plain HTTP on your LAN; those two need HTTPS (see below).
+Open <http://localhost:8080>. Over plain HTTP from another device on your LAN, games still run, but browsers disable controllers and the PSP and DOS cores. Put Retroshelf behind HTTPS for those (see below).
 
 ## Library layout
 
@@ -117,7 +118,7 @@ Playable in the browser (EmulatorJS 4.2.3 cores, loaded from `cdn.emulatorjs.org
 | GameCube | `gc`, `gamecube` | [Dolphin](https://dolphin-emu.org/) |
 | Wii | `wii` | [Dolphin](https://dolphin-emu.org/) |
 | Wii U | `wiiu` | [Cemu](https://cemu.info/) |
-| Nintendo Switch | `switch` | a Nintendo Switch emulator |
+| Nintendo Switch | `switch` | any Switch emulator (keys and firmware from your own console) |
 | PlayStation 2 | `ps2` | [PCSX2](https://pcsx2.net/) |
 | PlayStation 3 | `ps3` | [RPCS3](https://rpcs3.net/) |
 | PlayStation Vita | `psvita` | [Vita3K](https://vita3k.org/) |
@@ -128,9 +129,13 @@ Playable in the browser (EmulatorJS 4.2.3 cores, loaded from `cdn.emulatorjs.org
 
 **Nintendo 3DS is download-only.** EmulatorJS has no 3DS core, so 3DS games come with a download button and setup steps for Azahar.
 
-## HTTPS, PSP and cross-origin isolation
+## HTTPS, controllers and PSP
 
-PSP (PPSSPP) and DOS (DOSBox Pure) cores are only built with threads, which need `SharedArrayBuffer`. Browsers expose it only on cross-origin isolated pages, and only in a secure context.
+**Controllers need HTTPS.** Chromium and Firefox only expose the Gamepad API on secure pages: HTTPS, or `http://localhost` on the machine itself. On plain HTTP the browser never reports a controller, so neither Retroshelf nor EmulatorJS can see it. The player shows a notice when it runs on an insecure page.
+
+Gamepads that follow the standard mapping (Xbox, PlayStation, Switch Pro and most generic USB/Bluetooth pads) work out of the box. Browsers only report a controller after its first button press. EmulatorJS 4.2.x has a bug where a controller that is already active when the game page opens, or that is pressed while the game downloads, is never assigned to a player. Retroshelf works around it by assigning such controllers to the first free player as soon as the emulator is ready.
+
+**PSP and DOS need cross-origin isolation.** The PPSSPP and DOSBox Pure cores are only built with threads, which need `SharedArrayBuffer`. Browsers expose it only on cross-origin isolated pages, and only in a secure context.
 
 Retroshelf already sends the headers on every response:
 
@@ -148,6 +153,24 @@ What you need to provide is the secure context: HTTPS through your reverse proxy
 - `deploy/traefik-labels.txt`: router labels for the Docker/Podman provider.
 
 When isolation is missing, PSP and DOS games show a clear notice instead of a broken canvas. Every other system keeps working.
+
+## Languages
+
+The interface is available in English and Italian, including the player, the setup guides for desktop emulators, messages and notices.
+
+- **Automatic choice.** Retroshelf picks the first supported language in the browser's preference list (`navigator.languages`, which follows the system language by default), and falls back to English.
+- **Manual override.** Each device can choose a language in the sidebar; the choice is kept in that browser.
+- **Locale-aware formatting.** Numbers, file sizes, dates and relative times follow the active language.
+- **EmulatorJS menus** follow the same language (`EJS_language`). Some EmulatorJS menu entries aren't in its Italian file yet and stay in English.
+- **Installed app.** The PWA manifest description follows the browser's `Accept-Language`.
+
+The server never sends interface text. The API returns codes, such as a guide id, a BIOS note id or an unplayable reason, and the client translates them.
+
+To add a language:
+
+1. Copy `web/src/i18n/en.ts` to a new file and translate it. The `Messages` type makes the build fail if any key is missing or has the wrong shape.
+2. Register the language in `web/src/i18n/index.ts` (`Locale`, `LOCALES`, `LOCALE_NAMES`, `EJS_LANGUAGE`, `isLocale`) and in the inline script in `web/index.html`.
+3. Add its manifest description and language code in `server/src/http/routes/manifest.ts`.
 
 ## Running with Quadlet
 
@@ -242,6 +265,7 @@ server/src/
   util/              path safety, virtual ZIP, MIME types
 web/src/
   components/, hooks/, lib/   library UI (React)
+  i18n/              translator, English and Italian dictionaries
   play/              player page (framework-free TypeScript + EmulatorJS)
   sw/sw.ts           service worker
 deploy/              Quadlet unit, Caddy / Nginx / Traefik examples
@@ -252,6 +276,6 @@ deploy/              Quadlet unit, Caddy / Nginx / Traefik examples
 - EmulatorJS downloads a whole ROM before starting. Byte ranges are fully supported for downloads and resumable transfers, but the emulator itself doesn't use them.
 - Requests with several byte ranges at once get the full file (allowed by RFC 9110); single ranges get 206.
 - On-the-fly archives use classic ZIP, so a disc set over 4 GB can't be streamed. Convert such sets to CHD or PBP.
-- Gamepads work in any browser with the standard Gamepad API. Browsers only report a controller after its first button press. In the library, the D-pad moves between games, A opens, B goes back, LB/RB switch systems and Start plays.
+- Controllers need HTTPS (or localhost) and appear after their first button press. In the library, the D-pad moves between games, A opens, B goes back, LB/RB switch systems and Start plays.
 - Some browsers keep game audio muted until the first key press or tap on the player page.
 - Folders that ES-DE treats as a single game (for example a `Game.ps3` folder) aren't supported; only files are listed as games.
