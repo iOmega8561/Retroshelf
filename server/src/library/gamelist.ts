@@ -6,6 +6,8 @@ export interface GamelistEntry {
   name?: string;
   sortName?: string;
   description?: string;
+  /** Extra descriptions keyed by language (`<desc lang="en">`), a Retroshelf extension. */
+  descriptions?: Record<string, string>;
   developer?: string;
   publisher?: string;
   genre?: string;
@@ -25,14 +27,17 @@ export interface GamelistEntry {
 }
 
 const parser = new XMLParser({
-  ignoreAttributes: true,
+  // Attributes are read only for <desc lang="…">; everything else ignores them.
+  ignoreAttributes: false,
+  attributeNamePrefix: '@_',
   ignoreDeclaration: true,
   ignorePiTags: true,
   parseTagValue: false, // keep "0001" style values as strings
   trimValues: true,
   processEntities: true,
   htmlEntities: true,
-  isArray: (_name, jpath) => jpath === 'gameList.game' || jpath === 'gameList.folder',
+  isArray: (_name, jpath) =>
+    jpath === 'gameList.game' || jpath === 'gameList.folder' || jpath === 'gameList.game.desc' || jpath === 'gameList.folder.desc',
 });
 
 function text(value: unknown): string | undefined {
@@ -65,6 +70,26 @@ function parseRating(raw: string | undefined): number | undefined {
   return Math.round(Math.min(value, 1) * 100) / 100;
 }
 
+/**
+ * `<desc>` is the default text (what ES-DE and other frontends show); any number of
+ * `<desc lang="en">`, `<desc lang="it">`… add translations, keyed by base language.
+ */
+function parseDescriptions(raw: unknown): { description?: string; descriptions?: Record<string, string> } {
+  const list = Array.isArray(raw) ? raw : raw === undefined ? [] : [raw];
+  let description: string | undefined;
+  const descriptions: Record<string, string> = {};
+  for (const item of list) {
+    const value = text(item);
+    if (!value) continue;
+    const lang = typeof item === 'object' && item !== null ? (item as Record<string, unknown>)['@_lang'] : undefined;
+    const base = typeof lang === 'string' ? lang.trim().toLowerCase().split(/[-_]/)[0] : '';
+    if (base && /^[a-z]{2,3}$/.test(base)) descriptions[base] ??= value;
+    else description ??= value;
+  }
+  description ??= Object.values(descriptions)[0];
+  return { description, descriptions: Object.keys(descriptions).length ? descriptions : undefined };
+}
+
 function parseBool(raw: string | undefined): boolean {
   return raw?.toLowerCase() === 'true' || raw === '1';
 }
@@ -87,11 +112,13 @@ function toEntries(raws: Array<Record<string, unknown>>): GamelistEntry[] {
     const path = text(raw.path);
     if (!path) continue;
     const release = parseReleaseDate(text(raw.releasedate));
+    const { description, descriptions } = parseDescriptions(raw.desc);
     entries.push({
       path,
       name: text(raw.name),
       sortName: text(raw.sortname),
-      description: text(raw.desc),
+      description,
+      descriptions,
       developer: text(raw.developer),
       publisher: text(raw.publisher),
       genre: text(raw.genre),

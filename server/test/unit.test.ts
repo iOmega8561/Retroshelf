@@ -7,6 +7,7 @@ import { buffer } from 'node:stream/consumers';
 import { describe, it } from 'node:test';
 import { parseRange } from '../src/http/send.js';
 import { parseGamelist, parseReleaseDate, sortKey, splitGenres } from '../src/library/gamelist.js';
+import { systemForFolder } from '../src/library/systems.js';
 import { isSafeSegment, normalizeReferencedPath, resolveInside, safeRelativeFromSegments } from '../src/util/paths.js';
 import { buildZipLayout, crc32ForEntries, streamZipRange, zipSize } from '../src/util/zip.js';
 
@@ -32,6 +33,13 @@ describe('path safety', () => {
     assert.equal(normalizeReferencedPath('/etc/passwd'), null);
     assert.equal(normalizeReferencedPath('C:\\roms\\a.bin'), null);
     assert.equal(normalizeReferencedPath('~/.emulationstation/x.png'), null);
+  });
+});
+
+describe('system registry', () => {
+  it('recognises common folder aliases', () => {
+    assert.equal(systemForFolder('ngc').key, 'gc');
+    assert.equal(systemForFolder('3ds').key, 'n3ds');
   });
 });
 
@@ -90,6 +98,17 @@ describe('gamelist parsing', () => {
     assert.deepEqual(folders.map((f) => [f.path, f.name]), [['./Zelda', 'Zelda']]);
     assert.deepEqual(parseReleaseDate('19960000T000000'), { year: 1996, date: '1996' });
     assert.deepEqual(parseReleaseDate('garbage'), {});
+  });
+
+  it('reads translated descriptions next to the default one', () => {
+    const [entry] = parseGamelist(
+      '<gameList><game><path>./a.nds</path><desc>Testo italiano</desc><desc lang="en">English text</desc><desc lang="de-DE">Deutsch</desc></game></gameList>',
+    ).games;
+    assert.equal(entry?.description, 'Testo italiano');
+    assert.deepEqual(entry?.descriptions, { en: 'English text', de: 'Deutsch' });
+    const [plain] = parseGamelist('<gameList><game id="1" source="x"><path>./b.nds</path><desc>Only &amp; default</desc></game></gameList>').games;
+    assert.equal(plain?.description, 'Only & default');
+    assert.equal(plain?.descriptions, undefined);
   });
 
   it('splits genres and builds sort keys', () => {

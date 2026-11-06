@@ -410,6 +410,7 @@ export class Catalog {
     if (download) detail.download = download;
     if (downloadAll) detail.downloadAll = downloadAll;
     if (game.description) detail.description = game.description;
+    if (game.descriptions) detail.descriptions = game.descriptions;
     if (def.setup) detail.setup = def.setup;
 
     if (!def.core || !game.files.length) {

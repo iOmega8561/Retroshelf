@@ -39,6 +39,8 @@ export interface GameRecord {
   /** ES-DE "directory interpreted as file": the whole directory is the game. */
   directory?: string;
   description?: string;
+  /** Translated descriptions by language, from `<desc lang="…">`. */
+  descriptions?: Record<string, string>;
   developer?: string;
   publisher?: string;
   genres?: string[];
@@ -95,7 +97,7 @@ const EXTRAS_DIR = /^(updates?|upd|aggiornament[oi]|dlcs?|patch(?:es)?|add[- ]?o
 function extrasKind(dirName: string): ExtraKind | null {
   const match = EXTRAS_DIR.exec(dirName);
   if (!match?.[1]) return null;
-  const word = match[1].toLowerCase();
+  const word = match[1].normalize('NFC').toLowerCase();
   if (word.startsWith('dlc')) return 'dlc';
   if (word.startsWith('patch')) return 'patch';
   if (word.startsWith('add')) return 'addon';
@@ -191,9 +193,9 @@ async function indexMedia(absDir: string, maxDepth: number, followSymlinks: bool
     for (const file of files) {
       if (!MEDIA_EXTENSIONS.has(extensionOf(file))) continue;
       const rel = `${dirRel}/${file}`;
-      all.set(rel.toLowerCase(), rel);
+      all.set(rel.normalize('NFC').toLowerCase(), rel);
       if (!map) continue;
-      const stem = stripExtension(file).toLowerCase();
+      const stem = stripExtension(file).normalize('NFC').toLowerCase();
       if (!map.has(stem)) map.set(stem, rel);
       const base = path.posix.basename(stem);
       if (!map.has(base)) map.set(base, rel);
@@ -202,13 +204,13 @@ async function indexMedia(absDir: string, maxDepth: number, followSymlinks: bool
 
   for (const dirent of await readDirSafe(absDir)) {
     if (!dirent.isDirectory() && !(followSymlinks && dirent.isSymbolicLink())) continue;
-    const lower = dirent.name.toLowerCase();
+    const lower = dirent.name.normalize('NFC').toLowerCase();
     const kind = MEDIA_DIRS[lower];
     if (kind) {
       await indexDir(path.join(absDir, dirent.name), dirent.name, kind);
     } else if (MEDIA_PARENT_DIRS.has(lower)) {
       for (const child of await readDirSafe(path.join(absDir, dirent.name))) {
-        const childKind = MEDIA_DIRS[child.name.toLowerCase()];
+        const childKind = MEDIA_DIRS[child.name.normalize('NFC').toLowerCase()];
         if (childKind && (child.isDirectory() || (followSymlinks && child.isSymbolicLink()))) {
           await indexDir(path.join(absDir, dirent.name, child.name), `${dirent.name}/${child.name}`, childKind);
         }
@@ -251,7 +253,7 @@ function displayNameFromFile(rel: string): string {
 
 /** 3DS ids share their last 8 hex digits across game/update/DLC; Switch ids their first 12. */
 function relatedTitleIds(a: string, b: string): boolean {
-  const ids = (text: string) => [...text.matchAll(/\b([0-9a-f]{16})\b/gi)].map((m) => m[1]!.toLowerCase());
+  const ids = (text: string) => [...text.matchAll(/\b([0-9a-f]{16})\b/gi)].map((m) => m[1]!.normalize('NFC').toLowerCase());
   for (const x of ids(a)) for (const y of ids(b)) if (x.slice(-8) === y.slice(-8) || x.slice(0, 12) === y.slice(0, 12)) return true;
   return false;
 }
@@ -264,7 +266,7 @@ function commonPrefix(a: string, b: string): number {
 
 export async function scanSystem(folder: string, absDir: string, def: SystemDef, opts: ScanOptions): Promise<SystemScan> {
   const isMediaTopDir = (name: string) => {
-    const lower = name.toLowerCase();
+    const lower = name.normalize('NFC').toLowerCase();
     return lower in MEDIA_DIRS || MEDIA_PARENT_DIRS.has(lower);
   };
   const allowed = (rel: string) => {
@@ -294,7 +296,7 @@ export async function scanSystem(folder: string, absDir: string, def: SystemDef,
   const extraInfo = new Map<string, { ownerDir: string; kind: ExtraKind }>();
   const insideDirectory = new Map<string, string[]>();
   for (const rel of walked.files) {
-    if (rel.toLowerCase() === 'gamelist.xml' || NON_ROM_EXTENSIONS.has(extensionOf(rel))) continue;
+    if (rel.normalize('NFC').toLowerCase() === 'gamelist.xml' || NON_ROM_EXTENSIONS.has(extensionOf(rel))) continue;
     const root = directoryOf(rel);
     if (root) {
       insideDirectory.set(root, [...(insideDirectory.get(root) ?? []), rel]);
@@ -322,11 +324,11 @@ export async function scanSystem(folder: string, absDir: string, def: SystemDef,
   const lowerIndex = new Map<string, string>();
   for (const ref of refs) {
     files.set(ref.rel, ref);
-    lowerIndex.set(ref.rel.toLowerCase(), ref.rel);
+    lowerIndex.set(ref.rel.normalize('NFC').toLowerCase(), ref.rel);
   }
   // Disc sets may point at files deeper inside a folder game: resolve against everything walked.
-  const walkedLower = new Map(walked.files.map((rel) => [rel.toLowerCase(), rel]));
-  const resolveFile = (rel: string) => (files.has(rel) ? rel : (lowerIndex.get(rel.toLowerCase()) ?? walkedLower.get(rel.toLowerCase())));
+  const walkedLower = new Map(walked.files.map((rel) => [rel.normalize('NFC').toLowerCase(), rel]));
+  const resolveFile = (rel: string) => (files.has(rel) ? rel : (lowerIndex.get(rel.normalize('NFC').toLowerCase()) ?? walkedLower.get(rel.normalize('NFC').toLowerCase())));
   const absFor = (rel: string) => path.join(absDir, rel);
   const refFor = async (rel: string): Promise<FileRef | undefined> => files.get(rel) ?? (await statAll(absDir, [rel]))[0];
 
@@ -362,13 +364,13 @@ export async function scanSystem(folder: string, absDir: string, def: SystemDef,
   for (const entry of gamelist.games) {
     const normalized = normalizeReferencedPath(entry.path);
     if (!normalized) continue;
-    const rel = resolveFile(normalized) ?? directoryGames.find((root) => root.toLowerCase() === normalized.toLowerCase());
+    const rel = resolveFile(normalized) ?? directoryGames.find((root) => root.normalize('NFC').toLowerCase() === normalized.normalize('NFC').toLowerCase());
     if (rel && !entryFor.has(rel)) entryFor.set(rel, entry);
   }
   const folderEntryFor = new Map<string, GamelistEntry>();
   for (const entry of gamelist.folders) {
     const normalized = normalizeReferencedPath(entry.path);
-    if (normalized) folderEntryFor.set(normalized.toLowerCase(), entry);
+    if (normalized) folderEntryFor.set(normalized.normalize('NFC').toLowerCase(), entry);
   }
 
   const makeGame = (rel: string, gameFiles: FileRef[], entry: GamelistEntry | undefined, fallbackName: string): GameRecord | null => {
@@ -384,6 +386,7 @@ export async function scanSystem(folder: string, absDir: string, def: SystemDef,
       extras: [],
       baseDir: dirOf(gameFiles[0]?.rel ?? rel),
       description: entry?.description,
+      descriptions: entry?.descriptions,
       developer: entry?.developer,
       publisher: entry?.publisher,
       genres: splitGenres(entry?.genre),
@@ -415,7 +418,7 @@ export async function scanSystem(folder: string, absDir: string, def: SystemDef,
   // ES-DE folder games.
   for (const root of directoryGames) {
     const inside = (insideDirectory.get(root) ?? []).filter((rel) => dirOf(rel) === root && allowed(rel));
-    const sameName = inside.find((rel) => path.posix.basename(rel).toLowerCase() === path.posix.basename(root).toLowerCase());
+    const sameName = inside.find((rel) => path.posix.basename(rel).normalize('NFC').toLowerCase() === path.posix.basename(root).normalize('NFC').toLowerCase());
     const largest = [...inside].sort((a, b) => (files.get(b)?.size ?? 0) - (files.get(a)?.size ?? 0))[0];
     const primary = sameName ?? (inside.length === 1 ? inside[0] : largest);
     let gameFiles: FileRef[] = [];
@@ -476,7 +479,7 @@ export async function scanSystem(folder: string, absDir: string, def: SystemDef,
   for (const game of games) countByDir.set(game.baseDir, (countByDir.get(game.baseDir) ?? 0) + 1);
   for (const game of games) {
     if (entryOf.get(game) || !game.baseDir || countByDir.get(game.baseDir) !== 1) continue;
-    const entry = folderEntryFor.get(game.baseDir.toLowerCase());
+    const entry = folderEntryFor.get(game.baseDir.normalize('NFC').toLowerCase());
     if (!entry) {
       // "Game/Game (Europe) [id].cia" + "Game/UPDATE/…": the folder name is the clean title.
       if (game.extras.length && !game.directory) {
@@ -491,6 +494,7 @@ export async function scanSystem(folder: string, absDir: string, def: SystemDef,
       game.sortName = sortKey(entry.sortName || entry.name);
     }
     game.description ??= entry.description;
+    game.descriptions ??= entry.descriptions;
     game.developer ??= entry.developer;
     game.publisher ??= entry.publisher;
     game.genres ??= splitGenres(entry.genre);
@@ -507,13 +511,13 @@ export async function scanSystem(folder: string, absDir: string, def: SystemDef,
     if (!ref) return undefined;
     const rel = normalizeReferencedPath(ref);
     if (!rel || !MEDIA_EXTENSIONS.has(extensionOf(rel))) return undefined;
-    const known = media.all.get(rel.toLowerCase());
+    const known = media.all.get(rel.normalize('NFC').toLowerCase());
     if (known) return known;
     const abs = resolveInside(absDir, rel);
     if (!abs) return undefined;
     try {
       if ((await fs.stat(abs)).isFile()) {
-        media.all.set(rel.toLowerCase(), rel);
+        media.all.set(rel.normalize('NFC').toLowerCase(), rel);
         return rel;
       }
     } catch {
@@ -534,9 +538,9 @@ export async function scanSystem(folder: string, absDir: string, def: SystemDef,
   for (const game of games) {
     const entry = entryOf.get(game);
     // Match media by the game's file, then (for a game with its own folder) by the folder name.
-    const keys = [stripExtension(game.rel).toLowerCase()];
-    if (game.directory) keys.push(stripExtension(game.directory).toLowerCase());
-    else if (game.baseDir && countByDir.get(game.baseDir) === 1) keys.push(game.baseDir.toLowerCase());
+    const keys = [stripExtension(game.rel).normalize('NFC').toLowerCase()];
+    if (game.directory) keys.push(stripExtension(game.directory).normalize('NFC').toLowerCase());
+    else if (game.baseDir && countByDir.get(game.baseDir) === 1) keys.push(game.baseDir.normalize('NFC').toLowerCase());
     const image = await referencedMedia(entry?.image);
     const result: GameRecord['media'] = {
       cover:
@@ -589,7 +593,7 @@ export async function scanBios(biosDir: string, followSymlinks: boolean): Promis
       continue;
     }
     const folder = ref.rel.slice(0, slash);
-    const key = folder.toLowerCase();
+    const key = folder.normalize('NFC').toLowerCase();
     const bucket = byFolder.get(key) ?? { folder, files: [] };
     bucket.files.push(ref);
     byFolder.set(key, bucket);

@@ -72,7 +72,7 @@ export const SYSTEMS: readonly SystemDef[] = [
     folders: ['n3ds', '3ds'], extensions: ['3ds', 'cci', 'cxi', 'cia', '3dsx', 'app', 'elf', 'axf', 'z3dsx', 'zcci', 'zcia', 'zcxi'], coverAspect: 0.9,
     setup: { emulator: 'Azahar', url: 'https://azahar-emu.org/', guide: 'azahar' } },
   { key: 'gc', name: 'GameCube', shortName: 'GC', manufacturer: 'Nintendo', year: 2001,
-    folders: ['gc', 'gamecube'], extensions: ['iso', 'gcm', 'rvz', 'ciso', 'gcz', 'wia', 'dol', 'elf'], coverAspect: 0.7,
+    folders: ['gc', 'gamecube', 'ngc'], extensions: ['iso', 'gcm', 'rvz', 'ciso', 'gcz', 'wia', 'dol', 'elf'], coverAspect: 0.7,
     setup: { emulator: 'Dolphin', url: 'https://dolphin-emu.org/', guide: 'dolphin-gc' } },
   { key: 'wii', name: 'Wii', shortName: 'Wii', manufacturer: 'Nintendo', year: 2006,
     folders: ['wii'], extensions: ['iso', 'wbfs', 'rvz', 'wia', 'gcz', 'ciso', 'wad', 'dol', 'elf'], coverAspect: 0.7,
