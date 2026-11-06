@@ -1,0 +1,58 @@
+@import './tokens.css';
+
+html,
+body {
+  height: 100%;
+  overflow: hidden;
+  background: #000;
+  overscroll-behavior: none;
+}
+
+#game {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100dvh;
+}
+
+.chrome {
+  transition: opacity 200ms ease, transform 200ms ease;
+}
+.chrome[data-hidden='true'] {
+  opacity: 0;
+  transform: translateY(-0.5rem);
+  pointer-events: none;
+}
+
+.chrome-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2.5rem;
+  padding-inline: 0.75rem;
+  border-radius: 0.625rem;
+  color: #eeebf8;
+  font-size: 0.875rem;
+  font-weight: 600;
+  background: rgb(26 22 48 / 0.6);
+  backdrop-filter: blur(12px) saturate(1.4);
+  -webkit-backdrop-filter: blur(12px) saturate(1.4);
+  border: 1px solid rgb(196 181 253 / 0.16);
+}
+.chrome-button:hover {
+  border-color: var(--rs-accent);
+}
+
+.slot-card[data-empty='true'] .slot-thumb {
+  background: repeating-linear-gradient(135deg, var(--rs-raised) 0 6px, var(--rs-surface) 6px 12px);
+}
+
+.sheet-in {
+  animation: sheet-right 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+@keyframes sheet-right {
+  from {
+    transform: translateX(2rem);
+    opacity: 0;
+  }
+}
