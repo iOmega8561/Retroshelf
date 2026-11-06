@@ -153,7 +153,13 @@ export function GameDrawer({ game, system, favorite, onToggleFavorite, onClose, 
               ) : null}
               {detail?.download && (
                 <a href={downloadHref(detail.download.url)} data-nav className={`btn ${detail.play ? 'btn-secondary' : 'btn-primary flex-1 sm:flex-none'}`} download>
-                  <Download size={18} aria-hidden /> {detail.multiFile ? t('game.downloadZip') : t('game.downloadRom')}
+                  <Download size={18} aria-hidden />{' '}
+                  {detail.directory ? t('game.downloadFolder') : detail.multiFile ? t('game.downloadZip') : t('game.downloadRom')}
+                </a>
+              )}
+              {detail?.downloadAll && !detail.directory && (
+                <a href={detail.downloadAll.url} data-nav className="btn btn-secondary" download>
+                  <Download size={18} aria-hidden /> {t('game.downloadAll')}
                 </a>
               )}
               <button
@@ -212,12 +218,37 @@ export function GameDrawer({ game, system, favorite, onToggleFavorite, onClose, 
             {game.rating !== undefined && <Detail label={t('detail.rating')}>{t('detail.ratingValue', { value: Number((game.rating * 5).toFixed(1)) })}</Detail>}
             <Detail label={t('detail.file')}>
               {game.fileName}
-              <span className="text-muted">, {i18n.bytes(game.size)}</span>
+              {game.size > 0 && <span className="text-muted">, {i18n.bytes(game.size)}</span>}
             </Detail>
           </dl>
 
           {detail?.media.screenshot && detail.media.screenshot !== cover && (
             <img src={detail.media.screenshot} alt={t('game.screenshotAlt', { name: game.name })} loading="lazy" className="w-full rounded-xl bg-black object-contain" />
+          )}
+
+          {detail && detail.extras.length > 0 && (
+            <section aria-labelledby={`extras-${game.id}`}>
+              <h3 id={`extras-${game.id}`} className="text-sm font-semibold">
+                {t('extras.title')}
+              </h3>
+              <p className="mt-1.5 text-sm text-muted">{t('extras.hint')}</p>
+              <ul className="mt-3 divide-y divide-line overflow-hidden rounded-xl border border-line">
+                {detail.extras.map((extra) => (
+                  <li key={extra.url} className="flex items-center gap-3 px-3 py-2.5">
+                    <span className="w-28 shrink-0 text-xs font-semibold text-accent-text">{t(`extras.${extra.kind}`)}</span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm" title={extra.name}>
+                        {extra.name.split('/').pop()}
+                      </span>
+                      <span className="text-xs text-muted">{i18n.bytes(extra.size)}</span>
+                    </span>
+                    <a href={downloadHref(extra.url)} data-nav download className="btn-icon" aria-label={`${t('saves.export')}: ${extra.name.split('/').pop()}`}>
+                      <Download size={18} aria-hidden />
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </section>
           )}
 
           {detail?.setup && !detail.play && (

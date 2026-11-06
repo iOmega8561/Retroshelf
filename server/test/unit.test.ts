@@ -74,7 +74,7 @@ describe('gamelist parsing', () => {
   </gameList>`;
 
   it('extracts and normalises fields', () => {
-    const [first, second] = parseGamelist(xml);
+    const [first, second] = parseGamelist(xml).games;
     assert.equal(first?.name, 'Advance Wars');
     assert.equal(first?.description, 'Command & conquer \u2014 on the go.');
     assert.equal(first?.rating, 0.9);
@@ -85,7 +85,9 @@ describe('gamelist parsing', () => {
   });
 
   it('handles a single game and partial dates', () => {
-    assert.equal(parseGamelist('<gameList><game><path>./a.nes</path></game></gameList>').length, 1);
+    assert.equal(parseGamelist('<gameList><game><path>./a.nes</path></game></gameList>').games.length, 1);
+    const folders = parseGamelist('<gameList><folder><path>./Zelda</path><name>Zelda</name></folder></gameList>').folders;
+    assert.deepEqual(folders.map((f) => [f.path, f.name]), [['./Zelda', 'Zelda']]);
     assert.deepEqual(parseReleaseDate('19960000T000000'), { year: 1996, date: '1996' });
     assert.deepEqual(parseReleaseDate('garbage'), {});
   });

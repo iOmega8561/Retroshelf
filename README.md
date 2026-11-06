@@ -8,6 +8,7 @@ One rootless container, no database, no third-party APIs. The catalog comes from
 
 - [Quick start](#quick-start)
 - [Library layout](#library-layout)
+- [Game folders, updates and DLC](#game-folders-updates-and-dlc)
 - [Systems](#systems)
 - [HTTPS, controllers and PSP](#https-controllers-and-psp)
 - [Languages](#languages)
@@ -65,6 +66,36 @@ Mount one folder at `/library`, read-only:
 **BIOS files** go in `bios/<folder>/`, where `<folder>` is the system's ROM folder name or any of its aliases. Files placed flat in `bios/` (ES-DE style) are picked up when their names match the expected BIOS. A single file is handed to the emulator as-is; several are zipped together on the fly and EmulatorJS extracts them.
 
 After adding files, choose **Rescan library** in the sidebar.
+
+## Game folders, updates and DLC
+
+Games often come with extra files that aren't games on their own. Retroshelf follows ES-DE where it defines a convention and adds one where it doesn't.
+
+**Extras folders.** A subfolder named `UPDATE`, `DLC`, `PATCH` or `ADD-ONS` (also plurals and suffixes such as `Updates (EUR)` or `DLC v2`, any letter case) holds files that belong to the game in the folder above it:
+
+```
+roms/n3ds/
+└── The Legend of Zelda/
+    ├── The Legend of Zelda (Europe) (En,Fr,De) [0004000000033500].cia
+    ├── UPDATE/
+    │   └── The Legend of Zelda (Update v1.2) [0004000E00033500].cia
+    └── DLC/
+        └── The Legend of Zelda Bonus Pack [0004008C00033500].cia
+```
+
+- **One game, not three.** This shows up as a single game. Its updates and DLC are listed in the game's page, each with its own download, and **Download everything** fetches the whole folder as one ZIP.
+- **Gamelist entries.** Entries pointing at files inside extras folders are ignored.
+- **Several games in the folder above.** If the parent folder holds more than one game (for example a top-level `roms/n3ds/UPDATE/`), each file is matched by its title ID (3DS and Switch naming), then by name. Files that match nothing stay visible as games of their own rather than disappearing.
+
+**Titles for game folders.** If such a game has no `gamelist.xml` entry, the folder name becomes its title (`The Legend of Zelda` rather than the full file name). A `<folder>` entry for that folder in `gamelist.xml` provides the name, description and other metadata instead.
+
+**ES-DE folder games ("directories interpreted as files").** A directory whose name ends with an extension the system accepts is one game, exactly as in ES-DE. Examples are `Demon's Souls.ps3/`, `Persona 4.psvita/`, or `Final Fantasy VII.m3u/` containing the playlist and its discs. Matching works like this:
+
+- **Metadata:** a `<game>` entry whose `<path>` is the directory supplies the metadata.
+- **Playable systems:** the file inside with the same name (for example `Final Fantasy VII.m3u/Final Fantasy VII.m3u`) is what the emulator loads.
+- **Downloads:** the download is the whole directory as a ZIP.
+
+**Large downloads.** Download archives are streamed with ZIP64, so a game folder larger than 4 GB downloads fine, and interrupted downloads can resume.
 
 ## Systems
 
@@ -262,7 +293,7 @@ shared/api.d.ts      API contract shared by server and web (types only)
 server/src/
   library/           scanner, gamelist parser, disc sets, BIOS, system registry, catalog
   http/              app, security headers & CSP, range sender, routes
-  util/              path safety, virtual ZIP, MIME types
+  util/              path safety, virtual ZIP and streamed ZIP64, MIME types
 web/src/
   components/, hooks/, lib/   library UI (React)
   i18n/              translator, English and Italian dictionaries
@@ -275,7 +306,7 @@ deploy/              Quadlet unit, Caddy / Nginx / Traefik examples
 
 - EmulatorJS downloads a whole ROM before starting. Byte ranges are fully supported for downloads and resumable transfers, but the emulator itself doesn't use them.
 - Requests with several byte ranges at once get the full file (allowed by RFC 9110); single ranges get 206.
-- On-the-fly archives use classic ZIP, so a disc set over 4 GB can't be streamed. Convert such sets to CHD or PBP.
+- Disc sets streamed *into the emulator* use classic ZIP, so a set over 4 GB can't be played in the browser (browsers couldn't hold it in memory anyway); convert it to CHD or PBP. Downloads have no such limit.
 - Controllers need HTTPS (or localhost) and appear after their first button press. In the library, the D-pad moves between games, A opens, B goes back, LB/RB switch systems and Start plays.
 - Some browsers keep game audio muted until the first key press or tap on the player page.
 - Folders that ES-DE treats as a single game (for example a `Game.ps3` folder) aren't supported; only files are listed as games.

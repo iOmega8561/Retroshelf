@@ -74,7 +74,8 @@ interface TileProps {
 }
 
 const GameTile = memo(function GameTile({ game, system, favorite, showSystem, aspect, onOpen }: TileProps) {
-  const { t } = useI18n();
+  const i18n = useI18n();
+  const { t } = i18n;
   const [failed, setFailed] = useState(false);
   const shortName = system?.shortName ?? game.system;
   return (
@@ -96,6 +97,12 @@ const GameTile = memo(function GameTile({ game, system, favorite, showSystem, as
       <span className="mt-0.5 flex items-center gap-2 text-xs text-muted">
         {game.year && <span className="tabular-nums">{game.year}</span>}
         {showSystem && <span className="type-wide rounded border border-line px-1 text-[0.625rem] leading-4">{shortName}</span>}
+        {game.extraCount ? (
+          <span className="rounded bg-accent-soft px-1 text-[0.625rem] font-semibold leading-4 tabular-nums text-accent-text" title={i18n.plural('extras.badge', game.extraCount)}>
+            +{i18n.number(game.extraCount)}
+            <span className="sr-only">, {i18n.plural('extras.badge', game.extraCount)}</span>
+          </span>
+        ) : null}
         {system?.mode === 'download' && <span className="sr-only">{t('system.downloadOnly')}</span>}
       </span>
     </button>

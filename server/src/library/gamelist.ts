@@ -32,7 +32,7 @@ const parser = new XMLParser({
   trimValues: true,
   processEntities: true,
   htmlEntities: true,
-  isArray: (_name, jpath) => jpath === 'gameList.game',
+  isArray: (_name, jpath) => jpath === 'gameList.game' || jpath === 'gameList.folder',
 });
 
 function text(value: unknown): string | undefined {
@@ -69,12 +69,20 @@ function parseBool(raw: string | undefined): boolean {
   return raw?.toLowerCase() === 'true' || raw === '1';
 }
 
-export function parseGamelist(xml: string): GamelistEntry[] {
-  const doc = parser.parse(xml) as { gameList?: { game?: Array<Record<string, unknown>> } };
-  const games = doc.gameList?.game ?? [];
-  const entries: GamelistEntry[] = [];
+export interface Gamelist {
+  games: GamelistEntry[];
+  /** `<folder>` entries: metadata ES-DE keeps for subdirectories. */
+  folders: GamelistEntry[];
+}
 
-  for (const raw of games) {
+export function parseGamelist(xml: string): Gamelist {
+  const doc = parser.parse(xml) as { gameList?: { game?: Array<Record<string, unknown>>; folder?: Array<Record<string, unknown>> } };
+  return { games: toEntries(doc.gameList?.game ?? []), folders: toEntries(doc.gameList?.folder ?? []) };
+}
+
+function toEntries(raws: Array<Record<string, unknown>>): GamelistEntry[] {
+  const entries: GamelistEntry[] = [];
+  for (const raw of raws) {
     if (!raw || typeof raw !== 'object') continue;
     const path = text(raw.path);
     if (!path) continue;
