@@ -1,0 +1,128 @@
+/**
+ * Wire contract between the Retroshelf server and its web client.
+ * Declaration-only on purpose: both sides import it with `import type`,
+ * so nothing from this file is ever emitted or shipped at runtime.
+ */
+
+export type SystemMode = 'play' | 'download';
+
+export interface SystemSummary {
+  /** Folder name under /library/roms, used as the stable system id. */
+  id: string;
+  name: string;
+  shortName: string;
+  manufacturer: string;
+  year?: number;
+  /** `play`: runs in the browser. `download`: offer files + setup guide. */
+  mode: SystemMode;
+  /** Core needs SharedArrayBuffer, i.e. a cross-origin isolated secure context. */
+  requiresIsolation: boolean;
+  gameCount: number;
+  /** Approximate box-art aspect ratio (width / height) for grid tiles. */
+  coverAspect: number;
+}
+
+export interface GameSummary {
+  id: string;
+  system: string;
+  name: string;
+  /** Normalised, lowercase key for stable alphabetical sorting. */
+  sortName: string;
+  year?: number;
+  /** ISO date, `YYYY-MM-DD` or `YYYY`. */
+  releaseDate?: string;
+  genres?: string[];
+  developer?: string;
+  publisher?: string;
+  players?: string;
+  /** 0..1, as stored by ES-DE. */
+  rating?: number;
+  cover?: string;
+  fileName: string;
+  size: number;
+  /** Disc set (cue/bin, m3u, gdi, ccd) served as a single archive. */
+  multiFile?: boolean;
+}
+
+export interface LibraryPayload {
+  status: 'ready' | 'scanning';
+  scannedAt?: string;
+  durationMs?: number;
+  systems: SystemSummary[];
+  games: GameSummary[];
+}
+
+export interface FileLink {
+  name: string;
+  size: number;
+  url: string;
+}
+
+export interface PlayConfig {
+  /** Value for EJS_core. */
+  core: string;
+  gameUrl: string;
+  biosUrl?: string;
+  /** Stable, filesystem-safe name EmulatorJS uses for settings/state keys. */
+  gameName: string;
+  threads: boolean;
+  /** EmulatorJS data path (CDN), always ending in `/`. */
+  dataPath: string;
+  /** Max ROM size EmulatorJS caches in IndexedDB (bytes). */
+  cacheLimit: number;
+}
+
+export interface BiosInfo {
+  required: boolean;
+  present: boolean;
+  /** Folder the server looks in, relative to /library/bios. */
+  folder: string;
+  expected?: string[];
+  note?: string;
+  files: FileLink[];
+  bundle?: FileLink;
+}
+
+export interface SetupGuide {
+  emulator: string;
+  url?: string;
+  steps: string[];
+}
+
+export interface GameMedia {
+  cover?: string;
+  screenshot?: string;
+  titlescreen?: string;
+  marquee?: string;
+  fanart?: string;
+  video?: string;
+}
+
+export interface GameDetail extends GameSummary {
+  systemName: string;
+  description?: string;
+  media: GameMedia;
+  /** Single best download: the ROM itself, or a zip of the disc set. */
+  download?: FileLink;
+  /** Every file that belongs to the game. */
+  files: FileLink[];
+  play?: PlayConfig;
+  unplayableReason?: string;
+  bios: BiosInfo;
+  setup?: SetupGuide;
+}
+
+export interface HealthPayload {
+  status: 'ok';
+  scanning: boolean;
+  ready: boolean;
+  games: number;
+  systems: number;
+  scannedAt?: string;
+  uptimeSeconds: number;
+}
+
+export interface ScanResponse {
+  status: 'started' | 'running' | 'cooldown';
+  retryAfterSeconds?: number;
+}
