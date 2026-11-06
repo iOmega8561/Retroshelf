@@ -5,6 +5,7 @@ import { promisify } from 'node:util';
 import zlib from 'node:zlib';
 import type {
   BiosInfo,
+  ExtraLink,
   FileLink,
   GameDetail,
   GameSummary,
@@ -18,6 +19,7 @@ import type { Logger } from '../logger.js';
 import { stableId } from '../util/mime.js';
 import { encodePath } from '../util/paths.js';
 import { canZip, type ZipEntryInput } from '../util/zip.js';
+import { directoryContents } from './scanner.js';
 import { baseName, resolveBios, type BiosResolution } from './bios.js';
 import { archiveNameFor } from './discsets.js';
 import { listSystemFolders, scanBios, scanSystem, type BiosScan, type FileRef, type GameRecord } from './scanner.js';
@@ -153,7 +155,10 @@ export class Catalog {
         try {
           const result = await scanSystem(next.folder, next.abs, def, scanOptions);
           if (!result.games.length) continue;
-          for (const game of result.games) for (const file of game.files) romIndex.set(`${next.folder}/${file.rel}`, file);
+          for (const game of result.games) {
+            for (const file of game.files) romIndex.set(`${next.folder}/${file.rel}`, file);
+            for (const file of game.extras) romIndex.set(`${next.folder}/${file.rel}`, file);
+          }
           for (const rel of result.mediaFiles) mediaIndex.add(`${next.folder}/${rel}`);
           systems.push({ folder: next.folder, absDir: next.abs, def, games: result.games, bios: resolveBios(next.folder, def, bios) });
         } catch (error) {
@@ -249,11 +254,38 @@ export class Catalog {
 
   /* ---------------- archive descriptions ---------------- */
 
+  /** Disc set handed to the emulator (classic ZIP with CRCs up front, the most compatible form). */
   gameArchive(game: GameRecord): { name: string; entries: ZipEntryInput[] } | null {
     if (game.files.length < 2) return null;
     const primary = game.files[0]!;
     const entries = game.files.map((f) => ({ name: archiveNameFor(f.rel, primary.rel), absPath: f.abs, size: f.size, mtimeMs: f.mtimeMs }));
     return { name: `${baseName(primary.rel).replace(/\.[^.]+$/, '')}.zip`, entries };
+  }
+
+  /**
+   * "Download everything": an ES-DE folder game as its whole directory, or a game together with
+   * its update/DLC files, keeping the folder layout. Streamed with ZIP64 when needed.
+   */
+  downloadArchive(game: GameRecord): { name: string; entries: () => Promise<ZipEntryInput[]> } | null {
+    const system = this.system(game.folder);
+    if (!system) return null;
+    if (game.directory) {
+      const top = baseName(game.directory);
+      const root = path.join(system.absDir, game.directory);
+      return {
+        name: `${top.replace(/\.[^.]+$/, '')}.zip`,
+        entries: async () =>
+          (await directoryContents(root, this.config.followSymlinks)).map((f) => ({ name: `${top}/${f.rel}`, absPath: f.abs, size: f.size, mtimeMs: f.mtimeMs })),
+      };
+    }
+    if (!game.extras.length) return null;
+    const top = game.baseDir ? baseName(game.baseDir) : '';
+    const within = (rel: string) => (game.baseDir ? path.posix.relative(game.baseDir, rel) : rel);
+    const all = [...game.files, ...game.extras];
+    return {
+      name: `${top || baseName(game.rel).replace(/\.[^.]+$/, '')}.zip`,
+      entries: async () => all.map((f) => ({ name: top ? `${top}/${within(f.rel)}` : within(f.rel), absPath: f.abs, size: f.size, mtimeMs: f.mtimeMs })),
+    };
   }
 
   biosArchive(folder: string): { name: string; entries: ZipEntryInput[] } | null {
@@ -292,13 +324,12 @@ export class Catalog {
   }
 
   private gameSummary(game: GameRecord): GameSummary {
-    const primary = game.files[0]!;
     const summary: GameSummary = {
       id: game.id,
       system: game.folder,
       name: game.name,
       sortName: game.sortName,
-      fileName: baseName(primary.rel),
+      fileName: baseName(game.directory ?? game.rel),
       size: game.files.reduce((sum, f) => sum + f.size, 0),
     };
     if (game.year) summary.year = game.year;
@@ -311,6 +342,8 @@ export class Catalog {
     const cover = this.mediaUrl(game.folder, game.media.cover);
     if (cover) summary.cover = cover;
     if (game.files.length > 1) summary.multiFile = true;
+    if (game.extras.length) summary.extraCount = game.extras.length;
+    if (game.directory) summary.directory = true;
     return summary;
   }
 
@@ -345,15 +378,26 @@ export class Catalog {
     const { def } = system;
     const summary = this.gameSummary(game);
     const files: FileLink[] = game.files.map((f) => ({ name: f.rel, size: f.size, url: this.romUrl(game.folder, f.rel) }));
+    const extras: ExtraLink[] = game.extras.map((f) => ({ name: f.rel, size: f.size, url: this.romUrl(game.folder, f.rel), kind: f.kind }));
 
     const archive = this.gameArchive(game);
     const archiveOk = archive ? canZip(archive.entries) : false;
     const archiveUrl = archive ? `/files/bundles/${game.id}/${encodeURIComponent(archive.name)}` : undefined;
-    const download: FileLink | undefined = archive
-      ? archiveOk
-        ? { name: archive.name, size: summary.size, url: archiveUrl! }
-        : undefined
-      : files[0];
+    const full = this.downloadArchive(game);
+    const downloadAll: FileLink | undefined = full
+      ? {
+          name: full.name,
+          size: game.directory ? 0 : [...game.files, ...game.extras].reduce((sum, f) => sum + f.size, 0),
+          url: `/files/full/${game.id}/${encodeURIComponent(full.name)}`,
+        }
+      : undefined;
+    const download: FileLink | undefined = game.directory
+      ? downloadAll
+      : archive
+        ? archiveOk
+          ? { name: archive.name, size: summary.size, url: archiveUrl! }
+          : undefined
+        : files[0];
 
     const media: GameDetail['media'] = {};
     for (const [kind, rel] of Object.entries(game.media)) {
@@ -362,12 +406,13 @@ export class Catalog {
     }
 
     const bios = this.biosInfo(system);
-    const detail: GameDetail = { ...summary, systemName: def.name, media, files, bios };
+    const detail: GameDetail = { ...summary, systemName: def.name, media, files, extras, bios };
     if (download) detail.download = download;
+    if (downloadAll) detail.downloadAll = downloadAll;
     if (game.description) detail.description = game.description;
     if (def.setup) detail.setup = def.setup;
 
-    if (!def.core) {
+    if (!def.core || !game.files.length) {
       detail.unplayableReason = 'no-browser-core';
     } else if (archive && !archiveOk) {
       detail.unplayableReason = 'archive-too-large';

@@ -97,10 +97,10 @@ export const SYSTEMS: readonly SystemDef[] = [
     bios: { required: true, note: 'ps2-required' },
     setup: { emulator: 'PCSX2', url: 'https://pcsx2.net/', guide: 'pcsx2' } },
   { key: 'ps3', name: 'PlayStation 3', shortName: 'PS3', manufacturer: 'Sony', year: 2006,
-    folders: ['ps3'], extensions: ['iso', 'pkg'], coverAspect: 0.86,
+    folders: ['ps3'], extensions: ['ps3', 'iso', 'pkg'], coverAspect: 0.86,
     setup: { emulator: 'RPCS3', url: 'https://rpcs3.net/', guide: 'rpcs3' } },
   { key: 'psvita', name: 'PlayStation Vita', shortName: 'Vita', manufacturer: 'Sony', year: 2011,
-    folders: ['psvita'], extensions: ['vpk', 'zip'], coverAspect: 0.6,
+    folders: ['psvita'], extensions: ['psvita', 'vpk', 'zip'], coverAspect: 0.6,
     setup: { emulator: 'Vita3K', url: 'https://vita3k.org/', guide: 'vita3k' } },
 
   /* ---------------- Sega ---------------- */

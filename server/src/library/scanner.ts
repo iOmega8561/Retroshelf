@@ -1,11 +1,12 @@
 import type { Dirent } from 'node:fs';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import type { ExtraKind } from '../../../shared/api.js';
 import type { Logger } from '../logger.js';
 import { MEDIA_EXTENSIONS } from '../util/mime.js';
 import { extensionOf, normalizeReferencedPath, resolveInside, stripExtension } from '../util/paths.js';
 import { SET_EXTENSIONS, resolveDiscSet } from './discsets.js';
-import { parseGamelist, sortKey, splitGenres, type GamelistEntry } from './gamelist.js';
+import { parseGamelist, sortKey, splitGenres, type Gamelist, type GamelistEntry } from './gamelist.js';
 import type { SystemDef } from './systems.js';
 
 export interface FileRef {
@@ -16,6 +17,10 @@ export interface FileRef {
   mtimeMs: number;
 }
 
+export interface ExtraRef extends FileRef {
+  kind: ExtraKind;
+}
+
 export type MediaKind = 'cover' | 'screenshot' | 'titlescreen' | 'marquee' | 'fanart' | 'video';
 
 export interface GameRecord {
@@ -23,8 +28,16 @@ export interface GameRecord {
   folder: string;
   name: string;
   sortName: string;
-  /** Primary file first, followed by disc-set members. */
+  /** The game's path: its primary file, or its directory for an ES-DE folder game without one. */
+  rel: string;
+  /** Primary file first, then disc-set members: exactly what the emulator receives. */
   files: FileRef[];
+  /** Updates, DLC, patches and add-ons found in the game's extras folders (download only). */
+  extras: ExtraRef[];
+  /** Folder the game lives in, relative to the system folder ('' = the system folder itself). */
+  baseDir: string;
+  /** ES-DE "directory interpreted as file": the whole directory is the game. */
+  directory?: string;
   description?: string;
   developer?: string;
   publisher?: string;
@@ -73,9 +86,25 @@ const NON_ROM_EXTENSIONS = new Set([
   'srm', 'sav', 'state', 'auto', 'png', 'jpg', 'jpeg', 'gif', 'webp', 'avif', 'bmp', 'svg', 'mp4', 'webm', 'mkv',
 ]);
 
-interface WalkedFile {
-  rel: string;
-  abs: string;
+/**
+ * Extras folders ("Game/UPDATE/…", "Game/DLC (EUR)/…"): their files belong to the game in the
+ * folder above and are never listed as games of their own.
+ */
+const EXTRAS_DIR = /^(updates?|upd|aggiornament[oi]|dlcs?|patch(?:es)?|add[- ]?ons?)(?:[\s_.([-].*)?$/i;
+
+function extrasKind(dirName: string): ExtraKind | null {
+  const match = EXTRAS_DIR.exec(dirName);
+  if (!match?.[1]) return null;
+  const word = match[1].toLowerCase();
+  if (word.startsWith('dlc')) return 'dlc';
+  if (word.startsWith('patch')) return 'patch';
+  if (word.startsWith('add')) return 'addon';
+  return 'update';
+}
+
+interface Walked {
+  files: string[];
+  dirs: string[];
 }
 
 async function readDirSafe(dir: string): Promise<Dirent[]> {
@@ -101,8 +130,8 @@ async function isDirectoryOrFile(abs: string, dirent: Dirent, followSymlinks: bo
 }
 
 /** Depth-limited walk that skips dotfiles. `skip` is consulted for top-level directory names only. */
-async function walk(root: string, maxDepth: number, followSymlinks: boolean, skip: (name: string) => boolean): Promise<WalkedFile[]> {
-  const out: WalkedFile[] = [];
+export async function walk(root: string, maxDepth: number, followSymlinks: boolean, skip: (name: string) => boolean = () => false): Promise<Walked> {
+  const out: Walked = { files: [], dirs: [] };
   const visit = async (dir: string, relDir: string, depth: number): Promise<void> => {
     for (const dirent of await readDirSafe(dir)) {
       if (dirent.name.startsWith('.')) continue;
@@ -111,9 +140,10 @@ async function walk(root: string, maxDepth: number, followSymlinks: boolean, ski
       const kind = await isDirectoryOrFile(abs, dirent, followSymlinks);
       if (kind === 'dir') {
         if (depth === 0 && skip(dirent.name)) continue;
+        out.dirs.push(rel);
         if (depth + 1 < maxDepth) await visit(abs, rel, depth + 1);
       } else if (kind === 'file') {
-        out.push({ rel, abs });
+        out.files.push(rel);
       }
     }
   };
@@ -121,15 +151,16 @@ async function walk(root: string, maxDepth: number, followSymlinks: boolean, ski
   return out;
 }
 
-async function statAll(files: WalkedFile[]): Promise<FileRef[]> {
+async function statAll(root: string, rels: string[]): Promise<FileRef[]> {
   const result: FileRef[] = [];
   const BATCH = 64;
-  for (let i = 0; i < files.length; i += BATCH) {
+  for (let i = 0; i < rels.length; i += BATCH) {
     const batch = await Promise.all(
-      files.slice(i, i + BATCH).map(async (f) => {
+      rels.slice(i, i + BATCH).map(async (rel) => {
+        const abs = path.join(root, rel);
         try {
-          const stat = await fs.stat(f.abs);
-          return stat.isFile() ? { rel: f.rel, abs: f.abs, size: stat.size, mtimeMs: stat.mtimeMs } : null;
+          const stat = await fs.stat(abs);
+          return stat.isFile() ? { rel, abs, size: stat.size, mtimeMs: stat.mtimeMs } : null;
         } catch {
           return null;
         }
@@ -151,18 +182,18 @@ async function indexMedia(absDir: string, maxDepth: number, followSymlinks: bool
   const all = new Map<string, string>();
 
   const indexDir = async (dirAbs: string, dirRel: string, kind: MediaKind | 'mix' | 'other') => {
-    const files = await walk(dirAbs, maxDepth, followSymlinks, () => false);
+    const { files } = await walk(dirAbs, maxDepth, followSymlinks);
     let map = kind === 'other' ? undefined : byKind.get(kind);
     if (!map && kind !== 'other') {
       map = new Map();
       byKind.set(kind, map);
     }
     for (const file of files) {
-      if (!MEDIA_EXTENSIONS.has(extensionOf(file.rel))) continue;
-      const rel = `${dirRel}/${file.rel}`;
+      if (!MEDIA_EXTENSIONS.has(extensionOf(file))) continue;
+      const rel = `${dirRel}/${file}`;
       all.set(rel.toLowerCase(), rel);
       if (!map) continue;
-      const stem = stripExtension(file.rel).toLowerCase();
+      const stem = stripExtension(file).toLowerCase();
       if (!map.has(stem)) map.set(stem, rel);
       const base = path.posix.basename(stem);
       if (!map.has(base)) map.set(base, rel);
@@ -187,35 +218,58 @@ async function indexMedia(absDir: string, maxDepth: number, followSymlinks: bool
   return { byKind, all };
 }
 
-async function loadGamelist(absDir: string, opts: ScanOptions, folder: string): Promise<GamelistEntry[]> {
+async function loadGamelist(absDir: string, opts: ScanOptions, folder: string): Promise<Gamelist> {
+  const empty: Gamelist = { games: [], folders: [] };
   const file = path.join(absDir, 'gamelist.xml');
   let stat;
   try {
     stat = await fs.stat(file);
   } catch {
-    return [];
+    return empty;
   }
-  if (!stat.isFile()) return [];
+  if (!stat.isFile()) return empty;
   if (stat.size > opts.maxGamelistBytes) {
     opts.log.warn('gamelist.xml too large, ignoring', { system: folder, bytes: stat.size });
-    return [];
+    return empty;
   }
   try {
     return parseGamelist(await fs.readFile(file, 'utf8'));
   } catch (error) {
     opts.log.warn('gamelist.xml could not be parsed, falling back to file names', { system: folder, error: error as Error });
-    return [];
+    return empty;
   }
 }
 
+const dirOf = (rel: string) => {
+  const dir = path.posix.dirname(rel);
+  return dir === '.' ? '' : dir;
+};
+
 function displayNameFromFile(rel: string): string {
   return stripExtension(path.posix.basename(rel)).replace(/_/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+/** 3DS ids share their last 8 hex digits across game/update/DLC; Switch ids their first 12. */
+function relatedTitleIds(a: string, b: string): boolean {
+  const ids = (text: string) => [...text.matchAll(/\b([0-9a-f]{16})\b/gi)].map((m) => m[1]!.toLowerCase());
+  for (const x of ids(a)) for (const y of ids(b)) if (x.slice(-8) === y.slice(-8) || x.slice(0, 12) === y.slice(0, 12)) return true;
+  return false;
+}
+
+function commonPrefix(a: string, b: string): number {
+  let i = 0;
+  while (i < a.length && i < b.length && a[i] === b[i]) i += 1;
+  return i;
 }
 
 export async function scanSystem(folder: string, absDir: string, def: SystemDef, opts: ScanOptions): Promise<SystemScan> {
   const isMediaTopDir = (name: string) => {
     const lower = name.toLowerCase();
     return lower in MEDIA_DIRS || MEDIA_PARENT_DIRS.has(lower);
+  };
+  const allowed = (rel: string) => {
+    const ext = extensionOf(rel);
+    return def.extensions ? def.extensions.includes(ext) : !NON_ROM_EXTENSIONS.has(ext);
   };
 
   const [walked, media, gamelist] = await Promise.all([
@@ -224,38 +278,230 @@ export async function scanSystem(folder: string, absDir: string, def: SystemDef,
     loadGamelist(absDir, opts, folder),
   ]);
 
-  const candidates = walked.filter((f) => f.rel.toLowerCase() !== 'gamelist.xml' && !NON_ROM_EXTENSIONS.has(extensionOf(f.rel)));
+  /* ---- 1. ES-DE folder games: directories named like a ROM ("Game.ps3/", "Game.m3u/"). ---- */
+  const directoryGames: string[] = [];
+  if (def.extensions) {
+    for (const dir of [...walked.dirs].sort((a, b) => a.split('/').length - b.split('/').length)) {
+      if (!def.extensions.includes(extensionOf(path.posix.basename(dir)))) continue;
+      if (directoryGames.some((root) => dir.startsWith(`${root}/`))) continue;
+      directoryGames.push(dir);
+    }
+  }
+  const directoryOf = (rel: string) => directoryGames.find((root) => rel.startsWith(`${root}/`));
+
+  /* ---- 2. Partition files: inside folder games, inside extras folders, everything else. ---- */
+  const looseRels: string[] = [];
+  const extraInfo = new Map<string, { ownerDir: string; kind: ExtraKind }>();
+  const insideDirectory = new Map<string, string[]>();
+  for (const rel of walked.files) {
+    if (rel.toLowerCase() === 'gamelist.xml' || NON_ROM_EXTENSIONS.has(extensionOf(rel))) continue;
+    const root = directoryOf(rel);
+    if (root) {
+      insideDirectory.set(root, [...(insideDirectory.get(root) ?? []), rel]);
+      continue;
+    }
+    const segments = rel.split('/');
+    let extra: { ownerDir: string; kind: ExtraKind } | null = null;
+    for (let k = 0; k < segments.length - 1; k += 1) {
+      const kind = extrasKind(segments[k]!);
+      if (kind) {
+        extra = { ownerDir: segments.slice(0, k).join('/'), kind };
+        break;
+      }
+    }
+    if (extra) extraInfo.set(rel, extra);
+    else looseRels.push(rel);
+  }
+
+  // Inside a folder game only its top-level candidates (and disc-set members) need stats.
+  const directoryCandidates = [...insideDirectory.entries()].flatMap(([root, rels]) =>
+    rels.filter((rel) => dirOf(rel) === root && allowed(rel)),
+  );
+  const refs = await statAll(absDir, [...looseRels, ...extraInfo.keys(), ...directoryCandidates]);
   const files = new Map<string, FileRef>();
   const lowerIndex = new Map<string, string>();
-  for (const ref of await statAll(candidates)) {
+  for (const ref of refs) {
     files.set(ref.rel, ref);
     lowerIndex.set(ref.rel.toLowerCase(), ref.rel);
   }
-  const resolveFile = (rel: string) => (files.has(rel) ? rel : lowerIndex.get(rel.toLowerCase()));
-  const absFor = (rel: string) => files.get(rel)?.abs ?? path.join(absDir, rel);
-  const allowed = (rel: string) => {
-    const ext = extensionOf(rel);
-    return def.extensions ? def.extensions.includes(ext) : !NON_ROM_EXTENSIONS.has(ext);
-  };
+  // Disc sets may point at files deeper inside a folder game: resolve against everything walked.
+  const walkedLower = new Map(walked.files.map((rel) => [rel.toLowerCase(), rel]));
+  const resolveFile = (rel: string) => (files.has(rel) ? rel : (lowerIndex.get(rel.toLowerCase()) ?? walkedLower.get(rel.toLowerCase())));
+  const absFor = (rel: string) => path.join(absDir, rel);
+  const refFor = async (rel: string): Promise<FileRef | undefined> => files.get(rel) ?? (await statAll(absDir, [rel]))[0];
 
-  /* ---- Disc sets: playlists first so they claim the cue sheets they reference. ---- */
+  /* ---- 3. Disc sets among loose files: playlists first so they claim their cue sheets. ---- */
   const setOrder = (rel: string) => (extensionOf(rel) === 'm3u' ? 0 : 1);
-  const descriptors = [...files.keys()]
-    .filter((rel) => SET_EXTENSIONS.has(extensionOf(rel)) && allowed(rel))
+  const descriptors = looseRels
+    .filter((rel) => files.has(rel) && SET_EXTENSIONS.has(extensionOf(rel)) && allowed(rel))
     .sort((a, b) => setOrder(a) - setOrder(b) || a.localeCompare(b));
-  const claimedBy = new Map<string, string>();
+  const claimed = new Set<string>();
   const setMembers = new Map<string, string[]>();
   for (const rel of descriptors) {
-    if (claimedBy.has(rel)) continue;
+    if (claimed.has(rel)) continue;
     const members = await resolveDiscSet(rel, resolveFile, absFor);
     setMembers.set(rel, members);
     for (const member of members.slice(1)) {
-      if (!claimedBy.has(member)) claimedBy.set(member, rel);
+      claimed.add(member);
       setMembers.delete(member); // a cue claimed by an m3u is no longer its own game
     }
   }
+  const filesFor = async (rel: string): Promise<FileRef[]> => {
+    const members = setMembers.get(rel) ?? [rel];
+    const result: FileRef[] = [];
+    for (const member of members) {
+      const ref = await refFor(member);
+      if (ref) result.push(ref);
+    }
+    return result;
+  };
 
-  /* ---- Media resolution ---- */
+  /* ---- 4. Games ---- */
+  const games: GameRecord[] = [];
+  const entryFor = new Map<string, GamelistEntry>();
+  for (const entry of gamelist.games) {
+    const normalized = normalizeReferencedPath(entry.path);
+    if (!normalized) continue;
+    const rel = resolveFile(normalized) ?? directoryGames.find((root) => root.toLowerCase() === normalized.toLowerCase());
+    if (rel && !entryFor.has(rel)) entryFor.set(rel, entry);
+  }
+  const folderEntryFor = new Map<string, GamelistEntry>();
+  for (const entry of gamelist.folders) {
+    const normalized = normalizeReferencedPath(entry.path);
+    if (normalized) folderEntryFor.set(normalized.toLowerCase(), entry);
+  }
+
+  const makeGame = (rel: string, gameFiles: FileRef[], entry: GamelistEntry | undefined, fallbackName: string): GameRecord | null => {
+    if (entry?.hidden && !opts.showHidden) return null;
+    const name = entry?.name || fallbackName;
+    return {
+      id: opts.makeId(folder, rel),
+      folder,
+      name,
+      sortName: sortKey(entry?.sortName || name),
+      rel,
+      files: gameFiles,
+      extras: [],
+      baseDir: dirOf(gameFiles[0]?.rel ?? rel),
+      description: entry?.description,
+      developer: entry?.developer,
+      publisher: entry?.publisher,
+      genres: splitGenres(entry?.genre),
+      releaseDate: entry?.releaseDate,
+      year: entry?.year,
+      players: entry?.players,
+      rating: entry?.rating,
+      media: {},
+    };
+  };
+  const entryOf = new Map<GameRecord, GamelistEntry | undefined>();
+  const add = (game: GameRecord | null, entry: GamelistEntry | undefined) => {
+    if (!game) return;
+    games.push(game);
+    entryOf.set(game, entry);
+  };
+
+  // Loose files, gamelist order first, then files the gamelist doesn't know about.
+  const used = new Set<string>();
+  const ordered = [...gamelist.games.map((e) => normalizeReferencedPath(e.path)).map((n) => (n ? resolveFile(n) : undefined)), ...looseRels];
+  for (const rel of ordered) {
+    if (!rel || used.has(rel) || claimed.has(rel) || !files.has(rel) || extraInfo.has(rel) || directoryOf(rel)) continue;
+    const entry = entryFor.get(rel);
+    if (!entry && !allowed(rel)) continue;
+    used.add(rel);
+    add(makeGame(rel, await filesFor(rel), entry, displayNameFromFile(rel)), entry);
+  }
+
+  // ES-DE folder games.
+  for (const root of directoryGames) {
+    const inside = (insideDirectory.get(root) ?? []).filter((rel) => dirOf(rel) === root && allowed(rel));
+    const sameName = inside.find((rel) => path.posix.basename(rel).toLowerCase() === path.posix.basename(root).toLowerCase());
+    const largest = [...inside].sort((a, b) => (files.get(b)?.size ?? 0) - (files.get(a)?.size ?? 0))[0];
+    const primary = sameName ?? (inside.length === 1 ? inside[0] : largest);
+    let gameFiles: FileRef[] = [];
+    if (primary) {
+      const members = SET_EXTENSIONS.has(extensionOf(primary)) ? await resolveDiscSet(primary, resolveFile, absFor) : [primary];
+      for (const member of members) {
+        const ref = await refFor(member);
+        if (ref) gameFiles.push(ref);
+      }
+    }
+    if (!gameFiles.length) gameFiles = [];
+    const entry = entryFor.get(root);
+    const game = makeGame(primary ?? root, gameFiles, entry, displayNameFromFile(root));
+    if (game) {
+      game.id = opts.makeId(folder, root);
+      game.directory = root;
+      game.baseDir = root;
+    }
+    add(game, entry);
+  }
+
+  /* ---- 5. Attach extras to the game in the folder above them. ---- */
+  const byDir = new Map<string, GameRecord[]>();
+  for (const game of games) byDir.set(game.baseDir, [...(byDir.get(game.baseDir) ?? []), game]);
+  const orphans: string[] = [];
+  for (const [rel, { ownerDir, kind }] of extraInfo) {
+    const ref = files.get(rel);
+    if (!ref) continue;
+    const candidates = byDir.get(ownerDir) ?? [];
+    let owner: GameRecord | undefined = candidates.length === 1 ? candidates[0] : undefined;
+    if (!owner && candidates.length > 1) {
+      owner = candidates.find((game) => relatedTitleIds(rel, game.rel));
+      if (!owner) {
+        const key = sortKey(displayNameFromFile(rel));
+        let best = 0;
+        for (const game of candidates) {
+          const score = commonPrefix(key, sortKey(displayNameFromFile(game.rel)));
+          if (score > best && score >= 6) {
+            best = score;
+            owner = game;
+          }
+        }
+      }
+    }
+    if (owner) owner.extras.push({ ...ref, kind });
+    else orphans.push(rel);
+  }
+  // Extras we can't place stay visible as games rather than disappearing.
+  for (const rel of orphans) {
+    if (!allowed(rel)) continue;
+    const entry = entryFor.get(rel);
+    add(makeGame(rel, (await refFor(rel)) ? [files.get(rel)!] : [], entry, displayNameFromFile(rel)), entry);
+  }
+  for (const game of games) game.extras.sort((a, b) => a.kind.localeCompare(b.kind) || a.rel.localeCompare(b.rel));
+
+  /* ---- 6. `<folder>` metadata for a game alone in its folder, when it has no entry of its own. ---- */
+  const countByDir = new Map<string, number>();
+  for (const game of games) countByDir.set(game.baseDir, (countByDir.get(game.baseDir) ?? 0) + 1);
+  for (const game of games) {
+    if (entryOf.get(game) || !game.baseDir || countByDir.get(game.baseDir) !== 1) continue;
+    const entry = folderEntryFor.get(game.baseDir.toLowerCase());
+    if (!entry) {
+      // "Game/Game (Europe) [id].cia" + "Game/UPDATE/…": the folder name is the clean title.
+      if (game.extras.length && !game.directory) {
+        game.name = path.posix.basename(game.baseDir);
+        game.sortName = sortKey(game.name);
+      }
+      continue;
+    }
+    if (entry.hidden && !opts.showHidden) continue;
+    if (entry.name) {
+      game.name = entry.name;
+      game.sortName = sortKey(entry.sortName || entry.name);
+    }
+    game.description ??= entry.description;
+    game.developer ??= entry.developer;
+    game.publisher ??= entry.publisher;
+    game.genres ??= splitGenres(entry.genre);
+    game.releaseDate ??= entry.releaseDate;
+    game.year ??= entry.year;
+    game.players ??= entry.players;
+    game.rating ??= entry.rating;
+    entryOf.set(game, entry);
+  }
+
+  /* ---- 7. Media ---- */
   const mediaFiles = new Set<string>();
   const referencedMedia = async (ref: string | undefined): Promise<string | undefined> => {
     if (!ref) return undefined;
@@ -275,27 +521,35 @@ export async function scanSystem(folder: string, absDir: string, def: SystemDef,
     }
     return undefined;
   };
-  const conventional = (kind: MediaKind | 'mix', romRel: string): string | undefined => {
+  const conventional = (kind: MediaKind | 'mix', keys: string[]): string | undefined => {
     const map = media.byKind.get(kind);
     if (!map) return undefined;
-    const stem = stripExtension(romRel).toLowerCase();
-    return map.get(stem) ?? map.get(path.posix.basename(stem));
+    for (const key of keys) {
+      const hit = map.get(key) ?? map.get(path.posix.basename(key));
+      if (hit) return hit;
+    }
+    return undefined;
   };
 
-  const buildMedia = async (romRel: string, entry?: GamelistEntry): Promise<GameRecord['media']> => {
+  for (const game of games) {
+    const entry = entryOf.get(game);
+    // Match media by the game's file, then (for a game with its own folder) by the folder name.
+    const keys = [stripExtension(game.rel).toLowerCase()];
+    if (game.directory) keys.push(stripExtension(game.directory).toLowerCase());
+    else if (game.baseDir && countByDir.get(game.baseDir) === 1) keys.push(game.baseDir.toLowerCase());
     const image = await referencedMedia(entry?.image);
     const result: GameRecord['media'] = {
       cover:
-        conventional('cover', romRel) ??
+        conventional('cover', keys) ??
         (await referencedMedia(entry?.cover)) ??
         (await referencedMedia(entry?.thumbnail)) ??
         image ??
-        conventional('mix', romRel),
-      screenshot: conventional('screenshot', romRel) ?? (await referencedMedia(entry?.screenshot)),
-      titlescreen: conventional('titlescreen', romRel) ?? (await referencedMedia(entry?.titlescreen)),
-      marquee: conventional('marquee', romRel) ?? (await referencedMedia(entry?.marquee)),
-      fanart: conventional('fanart', romRel) ?? (await referencedMedia(entry?.fanart)),
-      video: conventional('video', romRel) ?? (await referencedMedia(entry?.video)),
+        conventional('mix', keys),
+      screenshot: conventional('screenshot', keys) ?? (await referencedMedia(entry?.screenshot)),
+      titlescreen: conventional('titlescreen', keys) ?? (await referencedMedia(entry?.titlescreen)),
+      marquee: conventional('marquee', keys) ?? (await referencedMedia(entry?.marquee)),
+      fanart: conventional('fanart', keys) ?? (await referencedMedia(entry?.fanart)),
+      video: conventional('video', keys) ?? (await referencedMedia(entry?.video)),
     };
     if (!result.screenshot && image && image !== result.cover) result.screenshot = image;
     if (!result.cover && result.screenshot) result.cover = result.screenshot;
@@ -304,52 +558,7 @@ export async function scanSystem(folder: string, absDir: string, def: SystemDef,
       if (value) mediaFiles.add(value);
       else delete result[key];
     }
-    return result;
-  };
-
-  /* ---- Assemble games ---- */
-  const games: GameRecord[] = [];
-  const used = new Set<string>();
-  const filesFor = (rel: string): FileRef[] =>
-    (setMembers.get(rel) ?? [rel]).map((member) => files.get(member)).filter((f): f is FileRef => Boolean(f));
-
-  for (const entry of gamelist) {
-    const normalized = normalizeReferencedPath(entry.path);
-    const rel = normalized ? resolveFile(normalized) : undefined;
-    if (!rel || used.has(rel) || claimedBy.has(rel)) continue;
-    used.add(rel);
-    if (entry.hidden && !opts.showHidden) continue;
-    const name = entry.name || displayNameFromFile(rel);
-    games.push({
-      id: opts.makeId(folder, rel),
-      folder,
-      name,
-      sortName: sortKey(entry.sortName || name),
-      files: filesFor(rel),
-      description: entry.description,
-      developer: entry.developer,
-      publisher: entry.publisher,
-      genres: splitGenres(entry.genre),
-      releaseDate: entry.releaseDate,
-      year: entry.year,
-      players: entry.players,
-      rating: entry.rating,
-      media: await buildMedia(rel, entry),
-    });
-  }
-
-  for (const rel of files.keys()) {
-    if (used.has(rel) || claimedBy.has(rel) || !allowed(rel)) continue;
-    used.add(rel);
-    const name = displayNameFromFile(rel);
-    games.push({
-      id: opts.makeId(folder, rel),
-      folder,
-      name,
-      sortName: sortKey(name),
-      files: filesFor(rel),
-      media: await buildMedia(rel),
-    });
+    game.media = result;
   }
 
   return { folder, absDir, games, mediaFiles };
@@ -367,8 +576,8 @@ export interface BiosScan {
 }
 
 export async function scanBios(biosDir: string, followSymlinks: boolean): Promise<BiosScan> {
-  const walked = await walk(biosDir, 3, followSymlinks, () => false);
-  const refs = await statAll(walked);
+  const { files: rels } = await walk(biosDir, 3, followSymlinks);
+  const refs = await statAll(biosDir, rels);
   const files = new Map<string, FileRef>();
   const byFolder = new Map<string, { folder: string; files: FileRef[] }>();
   const rootFiles: FileRef[] = [];
@@ -399,3 +608,12 @@ export async function listSystemFolders(romsDir: string, followSymlinks: boolean
   return result.sort((a, b) => a.folder.localeCompare(b.folder));
 }
 
+/**
+ * Every file of an ES-DE folder game, walked when a download is requested (not kept in memory:
+ * a PS3 folder game can hold thousands of files). Bounded so a runaway tree can't stall a request.
+ */
+export async function directoryContents(root: string, followSymlinks: boolean, limit = 100_000): Promise<FileRef[]> {
+  const { files } = await walk(root, 16, followSymlinks);
+  if (files.length > limit) throw new RangeError('Folder game has too many files to archive');
+  return statAll(root, files.sort());
+}

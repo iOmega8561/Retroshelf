@@ -24,6 +24,9 @@ export type GuideId =
   | 'xemu'
   | 'xenia'
   | 'unknown';
+/** Kind of extras folder a file came from ("UPDATE", "DLC", "PATCH", "ADD-ONS"). */
+export type ExtraKind = 'update' | 'dlc' | 'patch' | 'addon';
+
 export type BiosNoteId = 'gba-optional' | 'nds-optional' | 'psx-hle' | 'ps2-required' | 'saturn-hle' | 'dreamcast-optional' | 'amiga-aros';
 
 export interface SystemSummary {
@@ -63,6 +66,10 @@ export interface GameSummary {
   size: number;
   /** Disc set (cue/bin, m3u, gdi, ccd) served as a single archive. */
   multiFile?: boolean;
+  /** Number of update / DLC / patch / add-on files that belong to the game. */
+  extraCount?: number;
+  /** ES-DE folder game ("Game.ps3/"): the whole directory is the game. */
+  directory?: boolean;
 }
 
 export interface LibraryPayload {
@@ -77,6 +84,10 @@ export interface FileLink {
   name: string;
   size: number;
   url: string;
+}
+
+export interface ExtraLink extends FileLink {
+  kind: ExtraKind;
 }
 
 export interface PlayConfig {
@@ -126,8 +137,12 @@ export interface GameDetail extends GameSummary {
   media: GameMedia;
   /** Single best download: the ROM itself, or a zip of the disc set. */
   download?: FileLink;
-  /** Every file that belongs to the game. */
+  /** The file(s) the emulator receives: primary file and disc-set members. */
   files: FileLink[];
+  /** Updates, DLC, patches and add-ons from the game's extras folders. */
+  extras: ExtraLink[];
+  /** The game folder, or the game plus its extras, as one streamed ZIP (size unknown for folder games: 0). */
+  downloadAll?: FileLink;
   play?: PlayConfig;
   unplayableReason?: UnplayableReason;
   bios: BiosInfo;

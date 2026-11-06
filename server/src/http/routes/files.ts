@@ -5,7 +5,7 @@ import type { Config } from '../../config.js';
 import type { Catalog } from '../../library/catalog.js';
 import { binaryContentType, mediaContentType, strongEtag } from '../../util/mime.js';
 import { isSafeSegment, realpathInside, resolveInside, safeRelativeFromSegments } from '../../util/paths.js';
-import { buildZipLayout, canZip, crc32ForEntries, streamZipRange, zipSize, type ZipEntryInput } from '../../util/zip.js';
+import { buildZipLayout, canZip, crc32ForEntries, streamingZip, streamZipRange, zipSize, type ZipEntryInput } from '../../util/zip.js';
 import { fileSource, sendRanged, type RangedSource } from '../send.js';
 
 class NotFound extends Error {
@@ -41,6 +41,13 @@ async function openChecked(root: string, absPath: string, followSymlinks: boolea
   }
 }
 
+async function openCheckedDir(root: string, absDir: string, followSymlinks: boolean): Promise<void> {
+  if (!resolveInside(root, path.relative(root, absDir))) throw new NotFound();
+  if (!followSymlinks && !(await realpathInside(root, absDir))) throw new NotFound();
+  const stat = await fs.stat(absDir).catch(() => null);
+  if (!stat?.isDirectory()) throw new NotFound();
+}
+
 async function zipSource(entries: ZipEntryInput[]): Promise<RangedSource> {
   const fresh = await Promise.all(
     entries.map(async (entry) => {
@@ -57,6 +64,19 @@ async function zipSource(entries: ZipEntryInput[]): Promise<RangedSource> {
     contentType: 'application/zip',
     // CRCs are only computed when bytes are actually requested (never for HEAD).
     open: async (start, end) => streamZipRange(buildZipLayout(fresh, await crc32ForEntries(fresh)), start, end),
+  };
+}
+
+/** ZIP64-capable, streamed archive for downloads (no up-front CRC pass, no 4 GiB limit). */
+async function downloadSource(entries: ZipEntryInput[]): Promise<RangedSource> {
+  if (!entries.length) throw new NotFound();
+  const archive = streamingZip(entries);
+  return {
+    size: archive.size,
+    mtimeMs: Math.max(...entries.map((e) => e.mtimeMs)),
+    etag: strongEtag('zs', ...entries.map((e) => `${e.name}:${e.size}:${Math.floor(e.mtimeMs)}`)),
+    contentType: 'application/zip',
+    open: (start, end) => archive.open(start, end),
   };
 }
 
@@ -103,6 +123,35 @@ export function filesRouter(config: Config, catalog: Catalog): Router {
         cacheControl: ROM_CACHE,
         fileName: archive.name,
         disposition: wantsDownload(req) ? 'attachment' : 'inline',
+      });
+    }),
+  );
+
+  // /files/full/:gameId/<name>.zip — a folder game, or a game with its updates/DLC, in one download.
+  router.get(
+    '/full/:id/:name',
+    wrap(async (req, res) => {
+      const game = catalog.game(String(req.params.id));
+      const archive = game ? catalog.downloadArchive(game) : null;
+      if (!game || !archive || archive.name !== req.params.name) throw new NotFound();
+      const root = catalog.systemRoot(game.folder);
+      if (!root) throw new NotFound();
+      let entries: ZipEntryInput[];
+      try {
+        entries = await archive.entries();
+      } catch {
+        throw new NotFound();
+      }
+      if (game.directory) {
+        // The walk never leaves the folder; check the folder itself once instead of every file.
+        await openCheckedDir(root, path.join(root, game.directory), config.followSymlinks);
+      } else {
+        for (const entry of entries) await openChecked(root, entry.absPath, config.followSymlinks);
+      }
+      await sendRanged(req, res, await downloadSource(entries), {
+        cacheControl: ROM_CACHE,
+        fileName: archive.name,
+        disposition: 'attachment',
       });
     }),
   );

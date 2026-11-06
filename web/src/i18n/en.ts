@@ -129,6 +129,7 @@ export const en = {
     'Install Azahar for your desktop or Android device.',
     'Download the game file. Azahar needs decrypted dumps (.3ds, .cci, .cxi) or installable .cia files.',
     'Open Azahar and add the folder that contains the game, or use File › Load File.',
+    'Install .cia files (the game, its updates and DLC) with File › Install CIA.',
   ],
   'guide.dolphin-gc': [
     'Install Dolphin.',
@@ -150,6 +151,7 @@ export const en = {
     'Install a Switch emulator for your platform.',
     'Dump prod.keys and firmware from your own console; the emulator can’t start games without them.',
     'Download the game file and add its folder to the emulator’s game list.',
+    'If the game has updates or DLC, install them from the emulator’s menu after adding the game.',
   ],
   'guide.pcsx2': [
     'Install PCSX2.',
@@ -177,6 +179,17 @@ export const en = {
     'Download the game and open it with an emulator for this system.',
     'If this is a supported system under a different name, rename the folder to its ES-DE name (for example “megadrive”) and rescan.',
   ],
+
+  'game.downloadAll': 'Download everything (.zip)',
+  'game.downloadFolder': 'Download game folder (.zip)',
+  'extras.title': 'Updates and DLC',
+  'extras.hint': 'Files from this game’s update and DLC folders. Install them in your emulator after the game.',
+  'extras.update': 'Update',
+  'extras.dlc': 'DLC',
+  'extras.patch': 'Patch',
+  'extras.addon': 'Add-on',
+  'extras.badge_one': '{count} update or DLC file',
+  'extras.badge_other': '{count} update or DLC files',
 
   'saves.title': 'Saves on this device',
   'saves.blocked': 'This browser blocks storage for this site, so saves can’t be listed.',

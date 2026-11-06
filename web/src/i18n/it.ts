@@ -127,6 +127,7 @@ export const it: Messages = {
     'Installa Azahar sul computer o sul dispositivo Android.',
     'Scarica il file del gioco. Azahar richiede dump decrittati (.3ds, .cci, .cxi) o file .cia installabili.',
     'Apri Azahar e aggiungi la cartella che contiene il gioco, oppure usa File › Load File.',
+    'Installa i file .cia (gioco, aggiornamenti e DLC) con File › Install CIA.',
   ],
   'guide.dolphin-gc': [
     'Installa Dolphin.',
@@ -148,6 +149,7 @@ export const it: Messages = {
     'Installa un emulatore Switch per la tua piattaforma.',
     'Estrai prod.keys e firmware dalla tua console: senza, l’emulatore non può avviare i giochi.',
     'Scarica il file del gioco e aggiungi la sua cartella all’elenco giochi dell’emulatore.',
+    'Se il gioco ha aggiornamenti o DLC, installali dal menu dell’emulatore dopo aver aggiunto il gioco.',
   ],
   'guide.pcsx2': [
     'Installa PCSX2.',
@@ -178,6 +180,17 @@ export const it: Messages = {
     'Scarica il gioco e aprilo con un emulatore per questo sistema.',
     'Se si tratta di un sistema supportato con un altro nome, rinomina la cartella con il nome usato da ES-DE (per esempio “megadrive”) e aggiorna la libreria.',
   ],
+
+  'game.downloadAll': 'Scarica tutto (.zip)',
+  'game.downloadFolder': 'Scarica la cartella del gioco (.zip)',
+  'extras.title': 'Aggiornamenti e DLC',
+  'extras.hint': 'File delle cartelle di aggiornamenti e DLC di questo gioco. Installali nell’emulatore dopo il gioco.',
+  'extras.update': 'Aggiornamento',
+  'extras.dlc': 'DLC',
+  'extras.patch': 'Patch',
+  'extras.addon': 'Contenuto aggiuntivo',
+  'extras.badge_one': '{count} file di aggiornamento o DLC',
+  'extras.badge_other': '{count} file di aggiornamento o DLC',
 
   'saves.title': 'Salvataggi su questo dispositivo',
   'saves.blocked': 'Questo browser blocca l’archiviazione per il sito, quindi non è possibile elencare i salvataggi.',
