@@ -53,3 +53,15 @@ interface Window {
   EJS_ready?: () => void;
   EJS_emulator?: EjsEmulator;
 }
+
+/* Internals used to work around EmulatorJS 4.2.x dropping early gamepad connections. */
+interface EjsEmulator {
+  gamepad?: { gamepads: Array<{ id: string; index: number }> };
+  gamepadSelection?: string[];
+  gamepadLabels?: unknown[];
+  updateGamepadLabels?(): void;
+}
+
+interface Window {
+  EJS_language?: string;
+}
