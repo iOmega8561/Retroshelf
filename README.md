@@ -79,9 +79,11 @@ Mount one folder at `/library`, read-only:
     └── …
 ```
 
-**Systems** are the folder names under `roms/`, using ES-DE's names (`gba`, `megadrive`, `psx`, …). Unknown folders still appear, as download-only.
+**Systems** are the folder names under `roms/`, using ES-DE's names (`gba`, `megadrive`, `psx`, …) and common aliases (`3ds`, `ngc`, `genesis`, …). Unknown folders still appear, as download-only.
 
 **Metadata** comes from each folder's `gamelist.xml`: name, description, developer, publisher, genre, release date, players, rating and the `hidden` flag. Files that aren't in the gamelist are listed too, named after the file.
+
+**Descriptions in several languages.** Add `<desc lang="en">…</desc>` (or any other language code) next to the usual `<desc>`. Retroshelf shows the one matching the interface language and falls back to the plain `<desc>`, which stays what ES-DE and other frontends display. Genre names from scrapers are shown translated in the Italian interface.
 
 **Artwork** is matched by file name in `covers/`, `screenshots/`, `titlescreens/`, `marquees/`, `fanart/`, `videos/` and `miximages/` (also under `media/` or `downloaded_media/`), so `covers/Advance Wars (USA).png` belongs to `Advance Wars (USA).gba`. Image paths written in the gamelist (`<image>`, `<thumbnail>`, `<marquee>`, …) are used when no matching file exists. Covers are taken from `covers/` first, then `<thumbnail>`, `<image>` and mix images.
 
