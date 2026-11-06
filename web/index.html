@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Retroshelf</title>
+    <meta name="description" content="Your retro game library, playable in the browser." />
+    <link rel="manifest" href="/manifest.json" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="/icons/icon-192.png" type="image/png" sizes="192x192" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <meta name="theme-color" content="#1a1630" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#efecf7" media="(prefers-color-scheme: light)" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Retroshelf" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <script>try{var t=JSON.parse(localStorage.getItem('retroshelf:prefs')||'{}').theme;if(t==='dark'||t==='light')document.documentElement.dataset.theme=t}catch(e){}</script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <noscript>Retroshelf needs JavaScript to show your library.</noscript>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
