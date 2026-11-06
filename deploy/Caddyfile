@@ -1,0 +1,6 @@
+# Caddy: automatic HTTPS. Caddy passes the app's Cross-Origin-* headers through untouched,
+# which is all PSP (SharedArrayBuffer) needs.
+games.example.com {
+	encode zstd gzip
+	reverse_proxy 127.0.0.1:8080
+}

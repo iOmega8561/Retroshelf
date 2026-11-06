@@ -1,0 +1,53 @@
+# systemd Quadlet unit for rootless Podman.
+#
+#   mkdir -p ~/.config/containers/systemd
+#   cp retroshelf.container ~/.config/containers/systemd/
+#   systemctl --user daemon-reload
+#   systemctl --user start retroshelf
+#   loginctl enable-linger "$USER"   # keep it running after logout
+#
+# Build the image first:  podman build -t localhost/retroshelf:latest .
+
+[Unit]
+Description=Retroshelf retro game library
+Wants=network-online.target
+After=network-online.target
+
+[Container]
+Image=localhost/retroshelf:latest
+ContainerName=retroshelf
+
+# Bind to loopback; your reverse proxy terminates TLS and forwards here.
+PublishPort=127.0.0.1:8080:8080
+
+# The library is only ever read. Adjust the host path.
+# On SELinux hosts, ":z" relabels the folder for container access. If the library is shared
+# with other services, prefer leaving the labels alone and setting SecurityLabelDisable=true.
+Volume=%h/games/library:/library:ro,z
+
+# Map your host user onto the container's UID/GID 1000 so files you own are readable.
+UserNS=keep-id:uid=1000,gid=1000
+
+# Hardening: immutable root filesystem, no capabilities, no privilege escalation.
+ReadOnly=true
+DropCapability=ALL
+NoNewPrivileges=true
+
+Environment=APP_NAME=Retroshelf
+Environment=LOG_LEVEL=info
+# Environment=RESCAN_INTERVAL_MINUTES=60
+# Environment=SCAN_TOKEN=change-me
+
+HealthCmd=node /app/dist/healthcheck.js
+HealthInterval=30s
+HealthStartPeriod=20s
+HealthRetries=3
+
+[Service]
+Restart=on-failure
+TimeoutStartSec=300
+# A small library server; cap it so a runaway scan can't starve the host.
+MemoryMax=512M
+
+[Install]
+WantedBy=default.target
