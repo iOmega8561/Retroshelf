@@ -151,6 +151,8 @@ describe('catalog', () => {
     const ds = await json<GameDetail>(`/api/games/${gameByName('Some Game').id}`);
     assert.equal(ds.play, undefined);
     assert.equal(ds.setup?.emulator, 'Azahar');
+    assert.equal(ds.setup?.guide, 'azahar');
+    assert.equal(ds.unplayableReason, 'no-browser-core');
     assert.ok(ds.download);
   });
 });
@@ -262,6 +264,13 @@ describe('api surface', () => {
   it('guards rescans', async () => {
     assert.equal((await raw('POST', '/api/scan', { 'Sec-Fetch-Site': 'cross-site' })).status, 403);
     assert.ok([202, 429].includes((await raw('POST', '/api/scan')).status));
+  });
+
+  it('localises the manifest from Accept-Language', async () => {
+    const italian = JSON.parse((await raw('GET', '/manifest.json', { 'Accept-Language': 'it-IT,it;q=0.9,en;q=0.8' })).body.toString()) as { lang: string };
+    const fallback = JSON.parse((await raw('GET', '/manifest.json', { 'Accept-Language': 'de-DE,fr;q=0.8' })).body.toString()) as { lang: string };
+    assert.equal(italian.lang, 'it');
+    assert.equal(fallback.lang, 'en');
   });
 
   it('generates a manifest with system shortcuts', async () => {

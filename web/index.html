@@ -15,7 +15,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="Retroshelf" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <script>try{var t=JSON.parse(localStorage.getItem('retroshelf:prefs')||'{}').theme;if(t==='dark'||t==='light')document.documentElement.dataset.theme=t}catch(e){}</script>
+    <script>try{var d=document.documentElement,p=JSON.parse(localStorage.getItem('retroshelf:prefs')||'{}'),l=p.locale;if(p.theme==='dark'||p.theme==='light')d.dataset.theme=p.theme;if(l!=='en'&&l!=='it'){l='en';var n=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language];for(var i=0;i<n.length;i++){var b=String(n[i]||'').toLowerCase().split('-')[0];if(b==='it'||b==='en'){l=b;break}}}d.lang=l}catch(e){}</script>
   </head>
   <body>
     <div id="root"></div>

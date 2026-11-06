@@ -1,11 +1,12 @@
 import { useCallback, useState } from 'react';
+import { useI18n } from '../i18n/react';
 import { ApiError, fetchHealth, requestScan } from '../lib/api';
-import { plural } from '../lib/format';
 
 const sleep = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
 
 export function useRescan(reload: () => Promise<boolean>, toast: (message: string, tone?: 'info' | 'error') => void) {
   const [scanning, setScanning] = useState(false);
+  const i18n = useI18n();
 
   const rescan = useCallback(async () => {
     if (scanning) return;
@@ -13,7 +14,7 @@ export function useRescan(reload: () => Promise<boolean>, toast: (message: strin
     try {
       const result = await requestScan();
       if (result.status === 'cooldown') {
-        toast(`The library was just scanned. Try again in ${result.retryAfterSeconds ?? 10} seconds.`);
+        toast(i18n.plural('rescan.cooldown', result.retryAfterSeconds ?? 10));
         return;
       }
       // Poll until the server reports the scan finished (large NAS libraries can take a while).
@@ -23,18 +24,24 @@ export function useRescan(reload: () => Promise<boolean>, toast: (message: strin
         const health = await fetchHealth();
         if (!health.scanning) {
           await reload();
-          toast(`Library updated: ${plural(health.games, 'game', 'games')} in ${plural(health.systems, 'system', 'systems')}.`);
+          toast(
+            i18n.t('rescan.done', {
+              games: i18n.plural('count.games', health.games),
+              systems: i18n.plural('count.systems', health.systems),
+            }),
+          );
           return;
         }
         await sleep(1000);
       }
-      toast('The scan is still running. The library will update when you reload.');
+      toast(i18n.t('rescan.stillRunning'));
     } catch (error) {
-      toast(error instanceof ApiError ? error.message : 'Couldn\u2019t reach the server to rescan.', 'error');
+      const restricted = error instanceof ApiError && (error.status === 401 || error.status === 403);
+      toast(i18n.t(restricted ? 'rescan.restricted' : 'rescan.failed'), 'error');
     } finally {
       setScanning(false);
     }
-  }, [scanning, reload, toast]);
+  }, [scanning, reload, toast, i18n]);
 
   return { scanning, rescan };
 }

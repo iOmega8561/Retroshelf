@@ -1,3 +1,5 @@
+import { isLocale, type LocalePref } from '../i18n';
+
 /**
  * Tiny persisted stores on top of localStorage, shared by the library and the player.
  * Framework-free on purpose (the player page doesn't ship React); see hooks/useStore.ts.
@@ -58,11 +60,13 @@ export interface Prefs {
   theme: ThemePref;
   sort: SortKey;
   density: Density;
+  /** `auto` follows the browser/system language, falling back to English. */
+  locale: LocalePref;
 }
 
 const THEMES: ThemePref[] = ['system', 'dark', 'light'];
 const SORTS: SortKey[] = ['name', 'name-desc', 'newest', 'oldest', 'rating', 'recent'];
-const DEFAULT_PREFS: Prefs = { theme: 'system', sort: 'name', density: 'comfortable' };
+const DEFAULT_PREFS: Prefs = { theme: 'system', sort: 'name', density: 'comfortable', locale: 'auto' };
 
 /** Key read by the inline theme script in index.html before first paint. */
 export const prefsStore = persistedStore<Prefs>('retroshelf:prefs', DEFAULT_PREFS, (raw) => {
@@ -71,6 +75,7 @@ export const prefsStore = persistedStore<Prefs>('retroshelf:prefs', DEFAULT_PREF
     theme: THEMES.includes(value.theme as ThemePref) ? (value.theme as ThemePref) : DEFAULT_PREFS.theme,
     sort: SORTS.includes(value.sort as SortKey) ? (value.sort as SortKey) : DEFAULT_PREFS.sort,
     density: value.density === 'compact' ? 'compact' : 'comfortable',
+    locale: isLocale(value.locale) ? value.locale : 'auto',
   };
 });
 

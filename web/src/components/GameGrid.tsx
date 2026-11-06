@@ -1,5 +1,6 @@
 import { Star } from 'lucide-react';
 import { memo, useEffect, useRef, useState } from 'react';
+import { useI18n } from '../i18n/react';
 import type { IndexedGame } from '../lib/filter';
 import { hueFor } from '../lib/format';
 import type { Density } from '../lib/store';
@@ -23,6 +24,7 @@ interface GameGridProps {
  * off-screen tiles use content-visibility, so even very large libraries stay responsive.
  */
 export function GameGrid({ games, systems, favorites, density, showSystem, aspect, onOpen }: GameGridProps) {
+  const { t } = useI18n();
   const [limit, setLimit] = useState(PAGE);
   const sentinel = useRef<HTMLDivElement>(null);
 
@@ -43,7 +45,7 @@ export function GameGrid({ games, systems, favorites, density, showSystem, aspec
 
   return (
     <>
-      <ul className="shelf-grid" data-density={density} aria-label="Games">
+      <ul className="shelf-grid" data-density={density} aria-label={t('grid.label')}>
         {games.slice(0, limit).map((game) => (
           <li key={game.id}>
             <GameTile
@@ -72,6 +74,7 @@ interface TileProps {
 }
 
 const GameTile = memo(function GameTile({ game, system, favorite, showSystem, aspect, onOpen }: TileProps) {
+  const { t } = useI18n();
   const [failed, setFailed] = useState(false);
   const shortName = system?.shortName ?? game.system;
   return (
@@ -85,7 +88,7 @@ const GameTile = memo(function GameTile({ game, system, favorite, showSystem, as
         {favorite && (
           <span className="absolute right-1.5 top-1.5 grid size-6 place-items-center rounded-full bg-glass text-warn backdrop-blur-md">
             <Star size={13} fill="currentColor" aria-hidden />
-            <span className="sr-only">Favorite</span>
+            <span className="sr-only">{t('grid.favorite')}</span>
           </span>
         )}
       </div>
@@ -93,7 +96,7 @@ const GameTile = memo(function GameTile({ game, system, favorite, showSystem, as
       <span className="mt-0.5 flex items-center gap-2 text-xs text-muted">
         {game.year && <span className="tabular-nums">{game.year}</span>}
         {showSystem && <span className="type-wide rounded border border-line px-1 text-[0.625rem] leading-4">{shortName}</span>}
-        {system?.mode === 'download' && <span className="sr-only">Download only</span>}
+        {system?.mode === 'download' && <span className="sr-only">{t('system.downloadOnly')}</span>}
       </span>
     </button>
   );

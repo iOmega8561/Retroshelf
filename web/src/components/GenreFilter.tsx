@@ -1,5 +1,6 @@
 import { Check, ChevronDown } from 'lucide-react';
 import { useEffect, useId, useRef } from 'react';
+import { useI18n } from '../i18n/react';
 
 interface GenreFilterProps {
   options: Array<{ name: string; count: number }>;
@@ -12,6 +13,7 @@ interface GenreFilterProps {
  * (never clipped by the scrolling toolbar) and gets light-dismiss and Escape for free.
  */
 export function GenreFilter({ options, selected, onChange }: GenreFilterProps) {
+  const i18n = useI18n();
   const id = useId();
   const panelId = `genres-${id.replace(/:/g, '')}`;
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -49,9 +51,9 @@ export function GenreFilter({ options, selected, onChange }: GenreFilterProps) {
         disabled={!options.length}
         className="field inline-flex shrink-0 items-center gap-2 px-3.5 disabled:opacity-50"
       >
-        Genre
+        {i18n.t('genre.button')}
         {selected.length > 0 && (
-          <span className="rounded-full bg-accent-strong px-1.5 text-xs font-semibold tabular-nums text-white">{selected.length}</span>
+          <span className="rounded-full bg-accent-strong px-1.5 text-xs font-semibold tabular-nums text-white">{i18n.number(selected.length)}</span>
         )}
         <ChevronDown size={16} aria-hidden className="text-muted" />
       </button>
@@ -63,14 +65,14 @@ export function GenreFilter({ options, selected, onChange }: GenreFilterProps) {
         className="m-0 overflow-y-auto rounded-xl border border-line bg-surface p-1.5 text-fg shadow-2xl [inset:auto]"
       >
         <div className="flex items-center justify-between px-2.5 pb-1 pt-1.5">
-          <span className="text-sm font-semibold">Genres</span>
+          <span className="text-sm font-semibold">{i18n.t('genre.title')}</span>
           {selected.length > 0 && (
             <button type="button" data-nav className="text-sm text-accent-text hover:underline" onClick={() => onChange([])}>
-              Clear
+              {i18n.t('genre.clear')}
             </button>
           )}
         </div>
-        <ul role="group" aria-label="Genres">
+        <ul role="group" aria-label={i18n.t('genre.title')}>
           {options.map((option) => {
             const checked = selectedKeys.has(option.name.toLowerCase());
             return (
@@ -89,7 +91,7 @@ export function GenreFilter({ options, selected, onChange }: GenreFilterProps) {
                     {checked && <Check size={13} strokeWidth={3} aria-hidden />}
                   </span>
                   <span className="min-w-0 flex-1 truncate">{option.name}</span>
-                  <span className="text-xs tabular-nums text-muted">{option.count}</span>
+                  <span className="text-xs tabular-nums text-muted">{i18n.number(option.count)}</span>
                 </button>
               </li>
             );
