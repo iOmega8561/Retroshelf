@@ -91,6 +91,8 @@ export function GameDrawer({ game, system, favorite, onToggleFavorite, onClose, 
   const released = i18n.date(game.releaseDate);
   const systemName = detail?.systemName ?? system?.name ?? game.system;
   const emulator = detail?.setup?.emulator ?? t('setup.someEmulator');
+  // Text from <desc lang="…"> in the interface language, else the gamelist's default <desc>.
+  const description = detail?.descriptions?.[i18n.locale] ?? detail?.description;
   const biosPath = `/library/bios/${game.system}`;
 
   return (
@@ -199,8 +201,8 @@ export function GameDrawer({ game, system, favorite, onToggleFavorite, onClose, 
         </div>
 
         <div className="space-y-8 px-6 pb-[max(2.5rem,env(safe-area-inset-bottom))] sm:px-8">
-          {detail?.description ? (
-            <p className="max-w-[65ch] whitespace-pre-line text-[0.9375rem] leading-relaxed">{detail.description}</p>
+          {description ? (
+            <p className="max-w-[65ch] whitespace-pre-line text-[0.9375rem] leading-relaxed">{description}</p>
           ) : !detail && !loadError ? (
             <div className="space-y-2" aria-hidden>
               <div className="h-3.5 w-full animate-pulse rounded bg-raised" />
@@ -213,7 +215,7 @@ export function GameDrawer({ game, system, favorite, onToggleFavorite, onClose, 
             {game.developer && <Detail label={t('detail.developer')}>{game.developer}</Detail>}
             {game.publisher && <Detail label={t('detail.publisher')}>{game.publisher}</Detail>}
             {released && <Detail label={t('detail.released')}>{released}</Detail>}
-            {game.genres && <Detail label={t('detail.genre')}>{game.genres.join(', ')}</Detail>}
+            {game.genres && <Detail label={t('detail.genre')}>{game.genres.map(i18n.genre).join(', ')}</Detail>}
             {game.players && <Detail label={t('detail.players')}>{game.players}</Detail>}
             {game.rating !== undefined && <Detail label={t('detail.rating')}>{t('detail.ratingValue', { value: Number((game.rating * 5).toFixed(1)) })}</Detail>}
             <Detail label={t('detail.file')}>

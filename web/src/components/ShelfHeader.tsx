@@ -69,7 +69,7 @@ export function ShelfHeader(props: ShelfHeaderProps) {
           {filtered ? i18n.plural('shelf.filtered', props.total, { visible: props.visible }) : i18n.plural('count.games', props.total)}
         </span>
         {props.genres.map((genre) => (
-          <Chip key={genre} label={genre} removeLabel={t('filters.remove', { label: genre })} onRemove={() => props.onRemoveGenre(genre)} />
+          <Chip key={genre} label={i18n.genre(genre)} removeLabel={t('filters.remove', { label: i18n.genre(genre) })} onRemove={() => props.onRemoveGenre(genre)} />
         ))}
         {props.decade !== null && <Chip label={decadeLabel} removeLabel={t('filters.remove', { label: decadeLabel })} onRemove={props.onClearDecade} />}
         {filtered && (

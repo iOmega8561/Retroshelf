@@ -90,7 +90,7 @@ export function GenreFilter({ options, selected, onChange }: GenreFilterProps) {
                   >
                     {checked && <Check size={13} strokeWidth={3} aria-hidden />}
                   </span>
-                  <span className="min-w-0 flex-1 truncate">{option.name}</span>
+                  <span className="min-w-0 flex-1 truncate">{i18n.genre(option.name)}</span>
                   <span className="text-xs tabular-nums text-muted">{i18n.number(option.count)}</span>
                 </button>
               </li>

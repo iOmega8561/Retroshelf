@@ -1,4 +1,5 @@
 import { en } from './en';
+import { GENRES_IT } from './genres';
 import { it } from './it';
 
 /**
@@ -53,6 +54,8 @@ export interface Translator {
   /** "2001-09-10" → "10 September 2001" / "10 settembre 2001"; "1996" stays "1996". */
   date(value: string | undefined): string | undefined;
   relative(timestamp: number): string;
+  /** Genre label as written by scrapers, shown in the active language when known. */
+  genre(name: string): string;
 }
 
 const BYTE_UNITS = ['B', 'KB', 'MB', 'GB', 'TB'];
@@ -117,5 +120,6 @@ export function createTranslator(locale: Locale): Translator {
       if (abs < 86400 * 30) return relative.format(Math.round(seconds / 86400), 'day');
       return new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }).format(timestamp);
     },
+    genre: (name) => (locale === 'it' ? (GENRES_IT[name.trim().toLowerCase()] ?? name) : name),
   };
 }
