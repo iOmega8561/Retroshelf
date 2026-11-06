@@ -1,0 +1,273 @@
+import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
+import fs from 'node:fs';
+import http from 'node:http';
+import type { AddressInfo } from 'node:net';
+import os from 'node:os';
+import path from 'node:path';
+import { after, before, describe, it } from 'node:test';
+import type { GameDetail, LibraryPayload } from '../../shared/api.js';
+import { loadConfig } from '../src/config.js';
+import { createApp } from '../src/http/app.js';
+import { Catalog } from '../src/library/catalog.js';
+import { createLogger } from '../src/logger.js';
+
+const root = fs.mkdtempSync(path.join(os.tmpdir(), 'rs-lib-'));
+const lib = path.join(root, 'library');
+
+function write(rel: string, data: string | Buffer): void {
+  const abs = path.join(lib, rel);
+  fs.mkdirSync(path.dirname(abs), { recursive: true });
+  fs.writeFileSync(abs, data);
+}
+
+const PNG = Buffer.from('89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000d4944415478da63f8ffff3f0005fe02fea7d6a4a00000000049454e44ae426082', 'hex');
+
+function buildFixture(): void {
+  write('secret.txt', 'top secret');
+  write('roms/gba/Advance Wars (USA).gba', Buffer.alloc(4096, 1));
+  write('roms/gba/Homebrew_Demo.gba', Buffer.alloc(2048, 2));
+  write('roms/gba/notes.txt', 'not a game');
+  write('roms/gba/covers/Advance Wars (USA).png', PNG);
+  write(
+    'roms/gba/gamelist.xml',
+    `<?xml version="1.0"?><gameList><game><path>./Advance Wars (USA).gba</path><name>Advance Wars</name>
+     <releasedate>20010910T000000</releasedate><genre>Strategy</genre><desc>Tactics.</desc></game></gameList>`,
+  );
+  fs.symlinkSync(path.join(lib, 'secret.txt'), path.join(lib, 'roms/gba/link.gba'));
+
+  write('roms/psx/Disc Game.cue', 'FILE "Disc Game (Track 1).bin" BINARY\nFILE "disc game (track 2).BIN" BINARY\n');
+  write('roms/psx/Disc Game (Track 1).bin', Buffer.alloc(10_000, 3));
+  write('roms/psx/Disc Game (Track 2).bin', Buffer.alloc(5_000, 4));
+  write('roms/psx/Multi.m3u', '# playlist\nMulti (Disc 1).cue\nMulti (Disc 2).cue\n');
+  write('roms/psx/Multi (Disc 1).cue', 'FILE "Multi (Disc 1).bin" BINARY\n');
+  write('roms/psx/Multi (Disc 1).bin', Buffer.alloc(3000, 5));
+  write('roms/psx/Multi (Disc 2).cue', 'FILE "Multi (Disc 2).bin" BINARY\n');
+  write('roms/psx/Multi (Disc 2).bin', Buffer.alloc(3000, 6));
+  write('roms/psx/Solo.chd', Buffer.alloc(1000, 7));
+  write('roms/psx/Escape.cue', 'FILE "../../secret.txt" BINARY\n');
+
+  write('roms/n3ds/Some Game.3ds', Buffer.alloc(500, 8));
+  write('roms/mystery/thing.bin', Buffer.alloc(100, 9));
+
+  write('bios/gba/gba_bios.bin', Buffer.alloc(16_384, 10));
+  write('bios/psx/scph5501.bin', Buffer.alloc(1024, 11));
+  write('bios/psx/scph1001.bin', Buffer.alloc(1024, 12));
+  write('bios/psx/readme.txt', 'ignored for the core, still downloadable');
+}
+
+let server: http.Server;
+let base: string;
+let port: number;
+
+interface RawResponse {
+  status: number;
+  headers: http.IncomingHttpHeaders;
+  body: Buffer;
+}
+
+/** Raw request: unlike fetch(), sends the path exactly as written (no dot-segment normalisation). */
+function raw(method: string, rawPath: string, headers: Record<string, string> = {}): Promise<RawResponse> {
+  return new Promise((resolve, reject) => {
+    const req = http.request({ host: '127.0.0.1', port, method, path: rawPath, headers }, (res) => {
+      const chunks: Buffer[] = [];
+      res.on('data', (c: Buffer) => chunks.push(c));
+      res.on('end', () => resolve({ status: res.statusCode ?? 0, headers: res.headers, body: Buffer.concat(chunks) }));
+    });
+    req.on('error', reject);
+    req.end();
+  });
+}
+
+async function json<T>(urlPath: string): Promise<T> {
+  const res = await fetch(base + urlPath);
+  assert.equal(res.status, 200, urlPath);
+  return (await res.json()) as T;
+}
+
+let library: LibraryPayload;
+const gameByName = (name: string) => {
+  const game = library.games.find((g) => g.name === name);
+  assert.ok(game, `missing game ${name}`);
+  return game;
+};
+
+before(async () => {
+  buildFixture();
+  process.env.LIBRARY_DIR = lib;
+  process.env.WEB_DIR = path.join(root, 'no-web');
+  process.env.LOG_LEVEL = 'error';
+  process.env.SCAN_COOLDOWN_SECONDS = '0';
+  const config = loadConfig();
+  const log = createLogger(config.logLevel);
+  const catalog = new Catalog(config, log);
+  const app = await createApp(config, catalog, log);
+  await catalog.scan('test');
+  server = app.listen(0, '127.0.0.1');
+  await new Promise((r) => server.once('listening', r));
+  port = (server.address() as AddressInfo).port;
+  base = `http://127.0.0.1:${port}`;
+  library = await json<LibraryPayload>('/api/library');
+});
+
+after(() => {
+  server.close();
+  fs.rmSync(root, { recursive: true, force: true });
+});
+
+describe('catalog', () => {
+  it('orders systems by manufacturer and keeps unknown folders as download-only', () => {
+    assert.deepEqual(
+      library.systems.map((s) => [s.id, s.mode]),
+      [['gba', 'play'], ['n3ds', 'download'], ['psx', 'play'], ['mystery', 'download']],
+    );
+  });
+
+  it('merges gamelist metadata with unlisted files and ignores junk and symlinks', () => {
+    const gba = library.games.filter((g) => g.system === 'gba').map((g) => g.name).sort();
+    assert.deepEqual(gba, ['Advance Wars', 'Homebrew Demo']);
+    const aw = gameByName('Advance Wars');
+    assert.equal(aw.year, 2001);
+    assert.match(aw.cover ?? '', /^\/media\/gba\/covers\/Advance%20Wars%20\(USA\)\.png$/);
+  });
+
+  it('groups disc sets and hides their members', () => {
+    const psx = library.games.filter((g) => g.system === 'psx').map((g) => [g.name, Boolean(g.multiFile)]).sort();
+    assert.deepEqual(psx, [['Disc Game', true], ['Escape', false], ['Multi', true], ['Solo', false]]);
+    assert.equal(gameByName('Multi').size, 6000 + 2 * 'FILE "Multi (Disc 1).bin" BINARY\n'.length + '# playlist\nMulti (Disc 1).cue\nMulti (Disc 2).cue\n'.length);
+  });
+
+  it('builds play configs with BIOS delivery', async () => {
+    const aw = await json<GameDetail>(`/api/games/${gameByName('Advance Wars').id}`);
+    assert.equal(aw.play?.core, 'gba');
+    assert.equal(aw.play?.biosUrl, '/files/bios/gba/gba_bios.bin');
+    assert.equal(aw.description, 'Tactics.');
+
+    const disc = await json<GameDetail>(`/api/games/${gameByName('Disc Game').id}`);
+    assert.match(disc.play?.gameUrl ?? '', /^\/files\/bundles\/[\w-]+\/Disc%20Game\.zip$/);
+    assert.equal(disc.play?.biosUrl, '/files/bios-bundle/psx/psx-bios.zip');
+    assert.equal(disc.bios.files.length, 3);
+
+    const ds = await json<GameDetail>(`/api/games/${gameByName('Some Game').id}`);
+    assert.equal(ds.play, undefined);
+    assert.equal(ds.setup?.emulator, 'Azahar');
+    assert.ok(ds.download);
+  });
+});
+
+describe('byte ranges', () => {
+  const romPath = '/files/roms/gba/Advance%20Wars%20(USA).gba';
+
+  it('serves full, partial, suffix and HEAD requests', async () => {
+    const full = await raw('GET', romPath);
+    assert.equal(full.status, 200);
+    assert.equal(full.headers['accept-ranges'], 'bytes');
+    assert.equal(full.body.length, 4096);
+
+    const part = await raw('GET', romPath, { Range: 'bytes=100-199' });
+    assert.equal(part.status, 206);
+    assert.equal(part.headers['content-range'], 'bytes 100-199/4096');
+    assert.equal(part.body.length, 100);
+
+    const suffix = await raw('GET', romPath, { Range: 'bytes=-10' });
+    assert.equal(suffix.headers['content-range'], 'bytes 4086-4095/4096');
+
+    const head = await raw('HEAD', romPath);
+    assert.equal(head.status, 200);
+    assert.equal(head.headers['content-length'], '4096');
+    assert.equal(head.body.length, 0);
+  });
+
+  it('answers 416, honours If-Range and conditional requests', async () => {
+    const bad = await raw('GET', romPath, { Range: 'bytes=5000-' });
+    assert.equal(bad.status, 416);
+    assert.equal(bad.headers['content-range'], 'bytes */4096');
+
+    const first = await raw('HEAD', romPath);
+    const etag = String(first.headers.etag);
+    assert.equal((await raw('GET', romPath, { Range: 'bytes=0-9', 'If-Range': '"stale"' })).status, 200);
+    assert.equal((await raw('GET', romPath, { Range: 'bytes=0-9', 'If-Range': etag })).status, 206);
+    assert.equal((await raw('GET', romPath, { 'If-None-Match': etag })).status, 304);
+  });
+
+  it('streams disc sets and BIOS folders as valid, range-addressable zips', async () => {
+    const disc = await json<GameDetail>(`/api/games/${gameByName('Multi').id}`);
+    const url = disc.play!.gameUrl;
+    const head = await raw('HEAD', url);
+    const full = await raw('GET', url);
+    assert.equal(full.status, 200);
+    assert.equal(String(full.body.length), head.headers['content-length']);
+    const zipPath = path.join(root, 'multi.zip');
+    fs.writeFileSync(zipPath, full.body);
+    const names = execFileSync('python3', ['-c', 'import sys,zipfile; z=zipfile.ZipFile(sys.argv[1]); assert z.testzip() is None; print("|".join(z.namelist()))', zipPath]).toString().trim();
+    assert.equal(names, 'Multi.m3u|Multi (Disc 1).cue|Multi (Disc 1).bin|Multi (Disc 2).cue|Multi (Disc 2).bin');
+
+    const part = await raw('GET', url, { Range: 'bytes=50-1500' });
+    assert.equal(part.status, 206);
+    assert.deepEqual(part.body, full.body.subarray(50, 1501));
+
+    const bios = await raw('GET', '/files/bios-bundle/psx/psx-bios.zip');
+    assert.equal(bios.status, 200);
+    assert.equal(bios.headers['content-type'], 'application/zip');
+  });
+});
+
+describe('path safety over HTTP', () => {
+  const attempts = [
+    '/files/roms/gba/../../secret.txt',
+    '/files/roms/gba/..%2f..%2fsecret.txt',
+    '/files/roms/gba/%2e%2e/%2e%2e/secret.txt',
+    '/files/roms/gba/link.gba',
+    '/files/roms/gba/notes.txt',
+    '/files/roms/..%2f/secret.txt',
+    '/files/roms/psx/..%5c..%5csecret.txt',
+    '/files/bios/../secret.txt',
+    '/files/bios/..%2fsecret.txt',
+    '/files/bios/psx/%00scph5501.bin',
+    '/media/gba/../../secret.txt',
+    '/media/gba/covers/..%2f..%2f..%2fsecret.txt',
+    '/media/gba/Advance%20Wars%20(USA).gba',
+    '/files/bundles/xxxxxxxxxxxx/secret.zip',
+  ];
+
+  for (const attempt of attempts) {
+    it(`refuses ${attempt}`, async () => {
+      const res = await raw('GET', attempt);
+      assert.notEqual(res.status, 200);
+      assert.ok(!res.body.toString().includes('top secret'));
+    });
+  }
+
+  it('does not follow cue references outside the system folder', async () => {
+    const escape = await json<GameDetail>(`/api/games/${gameByName('Escape').id}`);
+    assert.equal(escape.files.length, 1);
+  });
+});
+
+describe('api surface', () => {
+  it('sends isolation and hardening headers', async () => {
+    const res = await raw('GET', '/api/health');
+    assert.equal(res.headers['cross-origin-opener-policy'], 'same-origin');
+    assert.equal(res.headers['cross-origin-embedder-policy'], 'require-corp');
+    assert.equal(res.headers['x-content-type-options'], 'nosniff');
+  });
+
+  it('serves the library compressed with an ETag', async () => {
+    const res = await raw('GET', '/api/library', { 'Accept-Encoding': 'gzip, br' });
+    assert.equal(res.headers['content-encoding'], 'br');
+    const again = await raw('GET', '/api/library', { 'If-None-Match': String(res.headers.etag) });
+    assert.equal(again.status, 304);
+  });
+
+  it('guards rescans', async () => {
+    assert.equal((await raw('POST', '/api/scan', { 'Sec-Fetch-Site': 'cross-site' })).status, 403);
+    assert.ok([202, 429].includes((await raw('POST', '/api/scan')).status));
+  });
+
+  it('generates a manifest with system shortcuts', async () => {
+    const res = await raw('GET', '/manifest.json');
+    assert.match(String(res.headers['content-type']), /application\/manifest\+json/);
+    const manifest = JSON.parse(res.body.toString()) as { shortcuts: Array<{ url: string }> };
+    assert.ok(manifest.shortcuts.some((s) => s.url === '/?system=psx'));
+  });
+});
