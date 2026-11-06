@@ -368,9 +368,9 @@ export class Catalog {
     if (def.setup) detail.setup = def.setup;
 
     if (!def.core) {
-      detail.unplayableReason = `${def.name} games can\u2019t run in a browser. Download the game and play it with ${def.setup?.emulator ?? 'a native emulator'}.`;
+      detail.unplayableReason = 'no-browser-core';
     } else if (archive && !archiveOk) {
-      detail.unplayableReason = 'This disc set is larger than 4 GB, too large to stream into the browser. Convert it to CHD or PBP to play here.';
+      detail.unplayableReason = 'archive-too-large';
     } else {
       const play: PlayConfig = {
         core: def.core,

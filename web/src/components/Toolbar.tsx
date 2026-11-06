@@ -1,5 +1,6 @@
 import { Grid2x2, Grid3x3, Menu, Search } from 'lucide-react';
 import type { RefObject } from 'react';
+import { useI18n } from '../i18n/react';
 import type { Facets } from '../lib/filter';
 import type { Density, SortKey } from '../lib/store';
 import { GenreFilter } from './GenreFilter';
@@ -21,20 +22,15 @@ interface ToolbarProps {
   onMenu(): void;
 }
 
-const SORT_LABELS: Record<SortKey, string> = {
-  name: 'Name, A to Z',
-  'name-desc': 'Name, Z to A',
-  newest: 'Newest first',
-  oldest: 'Oldest first',
-  rating: 'Highest rated',
-  recent: 'Recently played',
-};
+const SORT_KEYS: SortKey[] = ['name', 'name-desc', 'newest', 'oldest', 'rating', 'recent'];
 
 export function Toolbar(props: ToolbarProps) {
+  const i18n = useI18n();
+  const { t } = i18n;
   return (
     <div className="sticky top-0 z-30 border-b border-line bg-glass pt-[env(safe-area-inset-top)] backdrop-blur-xl backdrop-saturate-150">
       <div className="flex flex-wrap items-center gap-2 px-4 py-3 sm:px-6 lg:px-8">
-        <button type="button" data-nav className="btn-icon lg:hidden" onClick={props.onMenu} aria-label="Show systems">
+        <button type="button" data-nav className="btn-icon lg:hidden" onClick={props.onMenu} aria-label={t('toolbar.showSystems')}>
           <Menu size={20} aria-hidden />
         </button>
 
@@ -46,8 +42,8 @@ export function Toolbar(props: ToolbarProps) {
             data-nav
             value={props.query}
             onChange={(event) => props.onQuery(event.target.value)}
-            placeholder="Search games, developers, genres"
-            aria-label="Search games"
+            placeholder={t('toolbar.searchPlaceholder')}
+            aria-label={t('toolbar.searchLabel')}
             enterKeyHint="search"
             autoComplete="off"
             spellCheck={false}
@@ -65,12 +61,12 @@ export function Toolbar(props: ToolbarProps) {
             value={props.sort}
             disabled={props.sortLocked}
             onChange={(event) => props.onSort(event.target.value as SortKey)}
-            aria-label="Sort by"
-            title={props.sortLocked ? 'Recently played is always sorted by last played' : undefined}
+            aria-label={t('toolbar.sortLabel')}
+            title={props.sortLocked ? t('toolbar.sortLocked') : undefined}
           >
-            {(Object.keys(SORT_LABELS) as SortKey[]).map((key) => (
+            {SORT_KEYS.map((key) => (
               <option key={key} value={key}>
-                {SORT_LABELS[key]}
+                {t(`sort.${key}`)}
               </option>
             ))}
           </select>
@@ -83,12 +79,12 @@ export function Toolbar(props: ToolbarProps) {
             value={props.decade ?? ''}
             disabled={!props.facets.decades.length}
             onChange={(event) => props.onDecade(event.target.value ? Number(event.target.value) : null)}
-            aria-label="Release decade"
+            aria-label={t('toolbar.decadeLabel')}
           >
-            <option value="">Any year</option>
+            <option value="">{t('toolbar.anyYear')}</option>
             {props.facets.decades.map(({ decade, count }) => (
               <option key={decade} value={decade}>
-                {decade}s ({count})
+                {t('toolbar.decadeOption', { decade: t('decade', { decade: String(decade) }), count })}
               </option>
             ))}
           </select>
@@ -98,8 +94,8 @@ export function Toolbar(props: ToolbarProps) {
             data-nav
             className="btn-icon"
             aria-pressed={props.density === 'compact'}
-            aria-label="Compact grid"
-            title="Compact grid"
+            aria-label={t('toolbar.compact')}
+            title={t('toolbar.compact')}
             onClick={() => props.onDensity(props.density === 'compact' ? 'comfortable' : 'compact')}
           >
             {props.density === 'compact' ? <Grid3x3 size={19} aria-hidden /> : <Grid2x2 size={19} aria-hidden />}

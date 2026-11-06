@@ -7,7 +7,7 @@ function connected(): string[] {
     .map((pad) => pad.id);
 }
 
-/** Browsers only report a controller after its first button press. */
+/** Browsers only report a controller after its first button press, and only on secure pages. */
 export function useControllers(): string[] {
   const [pads, setPads] = useState<string[]>(connected);
   useEffect(() => {
@@ -22,11 +22,4 @@ export function useControllers(): string[] {
   return pads;
 }
 
-export function shortControllerName(id: string): string {
-  const cleaned = id.replace(/\(.*?\)/g, '').replace(/\s+/g, ' ').trim();
-  if (/xbox|xinput/i.test(id)) return 'Xbox controller';
-  if (/dualsense/i.test(id)) return 'DualSense';
-  if (/dualshock|playstation|054c/i.test(id)) return 'PlayStation controller';
-  if (/pro controller|057e/i.test(id)) return 'Switch Pro Controller';
-  return cleaned.slice(0, 40) || 'Controller';
-}
+export { controllerName } from '../lib/controllers';

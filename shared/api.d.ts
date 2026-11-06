@@ -6,11 +6,32 @@
 
 export type SystemMode = 'play' | 'download';
 
+/**
+ * User-facing text is never sent by the server: these codes are translated by the client
+ * (web/src/i18n), so every language ships complete with the UI.
+ */
+export type UnplayableReason = 'no-browser-core' | 'archive-too-large';
+export type GuideId =
+  | 'azahar'
+  | 'dolphin-gc'
+  | 'dolphin-wii'
+  | 'cemu'
+  | 'switch'
+  | 'pcsx2'
+  | 'rpcs3'
+  | 'vita3k'
+  | 'flycast'
+  | 'xemu'
+  | 'xenia'
+  | 'unknown';
+export type BiosNoteId = 'gba-optional' | 'nds-optional' | 'psx-hle' | 'ps2-required' | 'saturn-hle' | 'dreamcast-optional' | 'amiga-aros';
+
 export interface SystemSummary {
   /** Folder name under /library/roms, used as the stable system id. */
   id: string;
   name: string;
   shortName: string;
+  /** Brand name, or `Other` for unrecognised folders (translated by the client). */
   manufacturer: string;
   year?: number;
   /** `play`: runs in the browser. `download`: offer files + setup guide. */
@@ -78,15 +99,16 @@ export interface BiosInfo {
   /** Folder the server looks in, relative to /library/bios. */
   folder: string;
   expected?: string[];
-  note?: string;
+  note?: BiosNoteId;
   files: FileLink[];
   bundle?: FileLink;
 }
 
 export interface SetupGuide {
-  emulator: string;
+  guide: GuideId;
+  /** Proper name of the recommended emulator, when there is a single obvious one. */
+  emulator?: string;
   url?: string;
-  steps: string[];
 }
 
 export interface GameMedia {
@@ -107,7 +129,7 @@ export interface GameDetail extends GameSummary {
   /** Every file that belongs to the game. */
   files: FileLink[];
   play?: PlayConfig;
-  unplayableReason?: string;
+  unplayableReason?: UnplayableReason;
   bios: BiosInfo;
   setup?: SetupGuide;
 }

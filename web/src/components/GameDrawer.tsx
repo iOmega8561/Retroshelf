@@ -1,8 +1,9 @@
 import { Download, ExternalLink, Play, Star, TriangleAlert, X } from 'lucide-react';
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { useI18n } from '../i18n/react';
 import { downloadHref, fetchGame, playHref } from '../lib/api';
 import type { IndexedGame } from '../lib/filter';
-import { formatBytes, formatReleaseDate, hueFor } from '../lib/format';
+import { hueFor } from '../lib/format';
 import type { GameDetail, SystemSummary } from '../types';
 import { CartLabel } from './GameGrid';
 import { SavesSection } from './SavesSection';
@@ -32,6 +33,8 @@ function Detail({ label, children }: { label: string; children: ReactNode }) {
 }
 
 export function GameDrawer({ game, system, favorite, onToggleFavorite, onClose, toast }: GameDrawerProps) {
+  const i18n = useI18n();
+  const { t } = i18n;
   const [detail, setDetail] = useState<GameDetail | null>(null);
   const [loadError, setLoadError] = useState(false);
   const [coverFailed, setCoverFailed] = useState(false);
@@ -85,8 +88,10 @@ export function GameDrawer({ game, system, favorite, onToggleFavorite, onClose, 
   const isolationMissing = Boolean(detail?.play?.threads) && !window.crossOriginIsolated;
   const canPlay = Boolean(detail?.play) && !isolationMissing;
   const biosMissing = detail ? detail.bios.required && !detail.bios.present : false;
-  const released = formatReleaseDate(game.releaseDate);
+  const released = i18n.date(game.releaseDate);
   const systemName = detail?.systemName ?? system?.name ?? game.system;
+  const emulator = detail?.setup?.emulator ?? t('setup.someEmulator');
+  const biosPath = `/library/bios/${game.system}`;
 
   return (
     <div className="fixed inset-0 z-50" role="presentation">
@@ -107,7 +112,7 @@ export function GameDrawer({ game, system, favorite, onToggleFavorite, onClose, 
           )}
 
           <div className="flex justify-end p-3">
-            <button ref={closeButton} type="button" data-nav className="btn-icon bg-glass backdrop-blur-md" onClick={onClose} aria-label="Close">
+            <button ref={closeButton} type="button" data-nav className="btn-icon bg-glass backdrop-blur-md" onClick={onClose} aria-label={t('game.close')}>
               <X size={20} aria-hidden />
             </button>
           </div>
@@ -116,7 +121,7 @@ export function GameDrawer({ game, system, favorite, onToggleFavorite, onClose, 
             <div className="mx-auto w-44 sm:w-52">
               <div className="tile-cover shadow-2xl" style={{ aspectRatio: system?.coverAspect ?? 0.75 }}>
                 {cover && !coverFailed ? (
-                  <img src={cover} alt={`${game.name} cover`} onError={() => setCoverFailed(true)} />
+                  <img src={cover} alt={t('game.coverAlt', { name: game.name })} onError={() => setCoverFailed(true)} />
                 ) : (
                   <CartLabel name={game.name} system={system?.shortName ?? game.system} />
                 )}
@@ -143,12 +148,12 @@ export function GameDrawer({ game, system, favorite, onToggleFavorite, onClose, 
                   data-play
                   className="btn btn-primary min-w-36 flex-1 sm:flex-none"
                 >
-                  <Play size={18} fill="currentColor" aria-hidden /> Play
+                  <Play size={18} fill="currentColor" aria-hidden /> {t('game.play')}
                 </a>
               ) : null}
               {detail?.download && (
                 <a href={downloadHref(detail.download.url)} data-nav className={`btn ${detail.play ? 'btn-secondary' : 'btn-primary flex-1 sm:flex-none'}`} download>
-                  <Download size={18} aria-hidden /> Download {detail.multiFile ? 'game (.zip)' : 'ROM'}
+                  <Download size={18} aria-hidden /> {detail.multiFile ? t('game.downloadZip') : t('game.downloadRom')}
                 </a>
               )}
               <button
@@ -158,33 +163,29 @@ export function GameDrawer({ game, system, favorite, onToggleFavorite, onClose, 
                 aria-pressed={favorite}
                 onClick={() => {
                   onToggleFavorite();
-                  toast(favorite ? `Removed ${game.name} from favorites.` : `Added ${game.name} to favorites.`);
+                  toast(t(favorite ? 'game.favoriteRemoved' : 'game.favoriteAdded', { name: game.name }));
                 }}
               >
                 <Star size={18} aria-hidden fill={favorite ? 'currentColor' : 'none'} className={favorite ? 'text-warn' : ''} />
-                {favorite ? 'Favorite' : 'Add to favorites'}
+                {favorite ? t('game.favorite') : t('game.addFavorite')}
               </button>
             </div>
 
             <div className="mt-5 space-y-2">
-              {loadError && <p className="notice notice-warn">Couldn&rsquo;t load the details for this game. Check the connection and reopen it.</p>}
-              {detail?.unplayableReason && <p className="notice notice-info">{detail.unplayableReason}</p>}
+              {loadError && <p className="notice notice-warn">{t('game.loadError')}</p>}
+              {detail?.unplayableReason && (
+                <p className="notice notice-info">{t(`unplayable.${detail.unplayableReason}`, { system: systemName, emulator })}</p>
+              )}
               {isolationMissing && (
                 <p className="notice notice-warn">
                   <TriangleAlert size={18} className="shrink-0 text-warn" aria-hidden />
-                  <span>
-                    This emulator needs a secure connection. Open Retroshelf through your HTTPS reverse proxy, or at localhost on the machine running
-                    it.
-                  </span>
+                  <span>{t('game.needsIsolation')}</span>
                 </p>
               )}
               {biosMissing && detail && (
                 <p className="notice notice-warn">
                   <TriangleAlert size={18} className="shrink-0 text-warn" aria-hidden />
-                  <span>
-                    {systemName} needs a BIOS. Add {detail.bios.expected?.[0] ?? 'the BIOS file'} to <code>/library/bios/{game.system}</code>, then
-                    rescan.
-                  </span>
+                  <span>{t('game.biosMissing', { system: systemName, file: detail.bios.expected?.[0] ?? t('game.biosFileFallback'), path: biosPath })}</span>
                 </p>
               )}
             </div>
@@ -203,53 +204,52 @@ export function GameDrawer({ game, system, favorite, onToggleFavorite, onClose, 
           ) : null}
 
           <dl className="grid grid-cols-[minmax(6rem,auto)_1fr] gap-x-6 gap-y-2 text-sm">
-            {game.developer && <Detail label="Developer">{game.developer}</Detail>}
-            {game.publisher && <Detail label="Publisher">{game.publisher}</Detail>}
-            {released && <Detail label="Released">{released}</Detail>}
-            {game.genres && <Detail label="Genre">{game.genres.join(', ')}</Detail>}
-            {game.players && <Detail label="Players">{game.players}</Detail>}
-            {game.rating !== undefined && <Detail label="Rating">{`${Number((game.rating * 5).toFixed(1))} out of 5`}</Detail>}
-            <Detail label="File">
+            {game.developer && <Detail label={t('detail.developer')}>{game.developer}</Detail>}
+            {game.publisher && <Detail label={t('detail.publisher')}>{game.publisher}</Detail>}
+            {released && <Detail label={t('detail.released')}>{released}</Detail>}
+            {game.genres && <Detail label={t('detail.genre')}>{game.genres.join(', ')}</Detail>}
+            {game.players && <Detail label={t('detail.players')}>{game.players}</Detail>}
+            {game.rating !== undefined && <Detail label={t('detail.rating')}>{t('detail.ratingValue', { value: Number((game.rating * 5).toFixed(1)) })}</Detail>}
+            <Detail label={t('detail.file')}>
               {game.fileName}
-              <span className="text-muted">, {formatBytes(game.size)}</span>
+              <span className="text-muted">, {i18n.bytes(game.size)}</span>
             </Detail>
           </dl>
 
           {detail?.media.screenshot && detail.media.screenshot !== cover && (
-            <img src={detail.media.screenshot} alt={`${game.name} screenshot`} loading="lazy" className="w-full rounded-xl bg-black object-contain" />
+            <img src={detail.media.screenshot} alt={t('game.screenshotAlt', { name: game.name })} loading="lazy" className="w-full rounded-xl bg-black object-contain" />
           )}
 
           {detail?.setup && !detail.play && (
-            <section aria-label="Setup">
-              <h3 className="text-sm font-semibold">Play it with {detail.setup.emulator}</h3>
+            <section aria-label={t('setup.label')}>
+              <h3 className="text-sm font-semibold">{t('setup.title', { emulator })}</h3>
               <ol className="mt-3 list-decimal space-y-2 pl-5 text-[0.9375rem] leading-relaxed marker:text-muted">
-                {detail.setup.steps.map((step) => (
+                {i18n.list(`guide.${detail.setup.guide}`).map((step) => (
                   <li key={step}>{step}</li>
                 ))}
               </ol>
-              {detail.setup.url && (
-                <a href={detail.setup.url} target="_blank" rel="noopener noreferrer" data-nav className="btn btn-quiet mt-3 -ml-3">
-                  <ExternalLink size={16} aria-hidden /> Get {detail.setup.emulator}
+              {detail.setup.url && detail.setup.emulator && (
+                <a href={detail.setup.url} target="_blank" rel="noopener noreferrer" data-nav className="btn btn-quiet -ml-3 mt-3">
+                  <ExternalLink size={16} aria-hidden /> {t('setup.get', { emulator: detail.setup.emulator })}
                 </a>
               )}
             </section>
           )}
 
           {detail && (detail.bios.files.length > 0 || detail.bios.required) && (
-            <section aria-label="BIOS">
-              <h3 className="text-sm font-semibold">BIOS</h3>
-              {detail.bios.note && <p className="mt-1.5 text-sm text-muted">{detail.bios.note}</p>}
+            <section aria-label={t('bios.title')}>
+              <h3 className="text-sm font-semibold">{t('bios.title')}</h3>
+              {detail.bios.note && <p className="mt-1.5 text-sm text-muted">{t(`biosNote.${detail.bios.note}`)}</p>}
               {detail.bios.files.length === 0 ? (
                 <p className="mt-1.5 text-sm text-muted">
-                  None found in <code>/library/bios/{game.system}</code>
-                  {detail.bios.expected ? `. Expected: ${detail.bios.expected.join(', ')}.` : '.'}
+                  {t('bios.none', { path: biosPath })} {detail.bios.expected ? t('bios.expected', { files: detail.bios.expected.join(', ') }) : ''}
                 </p>
               ) : (
                 <ul className="mt-3 space-y-1">
                   {detail.bios.bundle && (
                     <li>
                       <a href={downloadHref(detail.bios.bundle.url)} data-nav download className="btn btn-quiet -ml-3">
-                        <Download size={16} aria-hidden /> All BIOS files (.zip)
+                        <Download size={16} aria-hidden /> {t('bios.bundle')}
                       </a>
                     </li>
                   )}
@@ -258,7 +258,7 @@ export function GameDrawer({ game, system, favorite, onToggleFavorite, onClose, 
                       <a href={downloadHref(file.url)} data-nav download className="btn btn-quiet -ml-3 max-w-full">
                         <Download size={16} aria-hidden className="shrink-0" />
                         <span className="truncate">{file.name}</span>
-                        <span className="text-xs text-muted">{formatBytes(file.size)}</span>
+                        <span className="text-xs text-muted">{i18n.bytes(file.size)}</span>
                       </a>
                     </li>
                   ))}
@@ -270,7 +270,7 @@ export function GameDrawer({ game, system, favorite, onToggleFavorite, onClose, 
           {detail && detail.files.length > 1 && (
             <details className="group">
               <summary className="cursor-pointer text-sm font-semibold" data-nav>
-                Files in this game ({detail.files.length})
+                {i18n.plural('files.title', detail.files.length)}
               </summary>
               <ul className="mt-2 space-y-1">
                 {detail.files.map((file) => (
@@ -278,7 +278,7 @@ export function GameDrawer({ game, system, favorite, onToggleFavorite, onClose, 
                     <a href={downloadHref(file.url)} data-nav download className="btn btn-quiet -ml-3 max-w-full">
                       <Download size={16} aria-hidden className="shrink-0" />
                       <span className="truncate">{file.name}</span>
-                      <span className="text-xs text-muted">{formatBytes(file.size)}</span>
+                      <span className="text-xs text-muted">{i18n.bytes(file.size)}</span>
                     </a>
                   </li>
                 ))}
@@ -286,7 +286,7 @@ export function GameDrawer({ game, system, favorite, onToggleFavorite, onClose, 
             </details>
           )}
 
-          {(detail?.play || game.id) && system?.mode !== 'download' && <SavesSection gameId={game.id} gameName={game.name} toast={toast} />}
+          {system?.mode !== 'download' && <SavesSection gameId={game.id} gameName={game.name} toast={toast} />}
         </div>
       </div>
     </div>

@@ -14,6 +14,7 @@ import { useRescan } from './hooks/useRescan';
 import { useStore } from './hooks/useStore';
 import { useTheme } from './hooks/useTheme';
 import { useUrlState } from './hooks/useUrlState';
+import { useI18n } from './i18n/react';
 
 import { applyFilters, computeFacets, indexGames, shelfGames, type Shelf } from './lib/filter';
 import { favoritesStore, prefsStore, recentStore, toggleFavorite, type SortKey } from './lib/store';
@@ -28,6 +29,8 @@ export default function App() {
   const [url, setUrl] = useUrlState();
   const controllers = useControllers();
   const toast = useToast();
+  const i18n = useI18n();
+  const { t } = i18n;
   const { scanning, rescan } = useRescan(library.reload, toast);
   const [menuOpen, setMenuOpen] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
@@ -60,8 +63,8 @@ export default function App() {
   const selected = url.game ? gamesById.get(url.game) : undefined;
 
   useEffect(() => {
-    document.title = `${shelfTitle(shelf, currentSystem)} \u2013 Retroshelf`;
-  }, [shelf, currentSystem]);
+    document.title = t('app.title', { shelf: shelfTitle(t, shelf, currentSystem) });
+  }, [t, shelf, currentSystem]);
 
   /* ---------- navigation ---------- */
 
@@ -152,6 +155,8 @@ export default function App() {
       onSelect={selectShelf}
       theme={prefs.theme}
       onTheme={(theme) => prefsStore.set((p) => ({ ...p, theme }))}
+      locale={prefs.locale}
+      onLocale={(locale) => prefsStore.set((p) => ({ ...p, locale }))}
       scanning={scanning}
       scannedAt={data?.scannedAt}
       onRescan={() => void rescan()}
@@ -166,53 +171,53 @@ export default function App() {
   if (!data && (library.status === 'loading' || library.status === 'scanning')) {
     content =
       library.status === 'scanning' ? (
-        <EmptyState title="Scanning your library">Reading /library/roms. Large collections can take a minute; the shelf fills in when it&rsquo;s done.</EmptyState>
+        <EmptyState title={t('empty.scanning.title')}>{t('empty.scanning.body')}</EmptyState>
       ) : (
         <GridSkeleton />
       );
   } else if (!data) {
     content = (
       <EmptyState
-        title="Can\u2019t reach the server"
+        title={t('empty.offline.title')}
         action={
           <button type="button" data-nav className="btn btn-primary" onClick={() => void library.reload()}>
-            Try again
+            {t('empty.offline.retry')}
           </button>
         }
       >
-        Check that Retroshelf is running and that this device can reach it.
+        {t('empty.offline.body')}
       </EmptyState>
     );
   } else if (allGames.length === 0) {
     content = (
       <EmptyState
-        title="No games yet"
+        title={t('empty.library.title')}
         action={
           <button type="button" data-nav className="btn btn-primary" onClick={() => void rescan()} disabled={scanning}>
-            <RefreshCw size={16} aria-hidden className={scanning ? 'animate-spin-slow' : ''} /> Rescan library
+            <RefreshCw size={16} aria-hidden className={scanning ? 'animate-spin-slow' : ''} /> {t('rescan.button')}
           </button>
         }
       >
-        Add one folder per system under <code>/library/roms</code>, for example <code>roms/gba</code> with your .gba files, then rescan.
+        {t('empty.library.body')}
       </EmptyState>
     );
   } else if (onShelf.length === 0 && shelf.kind === 'favorites') {
-    content = <EmptyState title="No favorites yet">Open a game and choose Add to favorites to keep it here.</EmptyState>;
+    content = <EmptyState title={t('empty.favorites.title')}>{t('empty.favorites.body')}</EmptyState>;
   } else if (onShelf.length === 0 && shelf.kind === 'recent') {
-    content = <EmptyState title="Nothing played yet">Games you start on this device show up here, most recent first.</EmptyState>;
+    content = <EmptyState title={t('empty.recent.title')}>{t('empty.recent.body')}</EmptyState>;
   } else if (visible.length === 0) {
     content = (
       <EmptyState
-        title="No games match"
+        title={t('empty.filtered.title')}
         action={
           filtered ? (
             <button type="button" data-nav className="btn btn-secondary" onClick={clearFilters}>
-              Clear filters
+              {t('filters.clear')}
             </button>
           ) : undefined
         }
       >
-        Try a shorter search or remove a filter.
+        {t('empty.filtered.body')}
       </EmptyState>
     );
   } else {
@@ -232,13 +237,13 @@ export default function App() {
   return (
     <div className="min-h-dvh lg:grid lg:grid-cols-[17rem_minmax(0,1fr)]">
       <a href="#games" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[80] focus:rounded-lg focus:bg-surface focus:px-4 focus:py-2">
-        Skip to games
+        {t('app.skip')}
       </a>
 
       <aside className="sticky top-0 hidden h-dvh border-r border-line bg-surface/50 lg:block">{sidebar}</aside>
 
       {menuOpen && (
-        <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true" aria-label="Systems">
+        <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true" aria-label={t('app.systemsDialog')}>
           <div className="scrim-in absolute inset-0 bg-scrim backdrop-blur-[6px]" onClick={() => setMenuOpen(false)} aria-hidden />
           <div className="panel-in-left absolute inset-y-0 left-0 w-[min(20rem,86vw)] bg-surface shadow-2xl" data-nav-scope>
             {sidebar}
