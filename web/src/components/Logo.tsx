@@ -2,14 +2,15 @@
 export function Logo({ className = '' }: { className?: string }) {
   return (
     <svg viewBox="0 0 512 512" aria-hidden="true" className={className}>
-      <rect width="512" height="512" rx="112" fill="#1a1630" />
-      <path d="M168 96h162l30 30v274a16 16 0 0 1-16 16H168a16 16 0 0 1-16-16V112a16 16 0 0 1 16-16Z" fill="#8b5cf6" />
-      <rect x="186" y="150" width="140" height="146" rx="12" fill="#2c2650" />
-      <rect x="208" y="176" width="96" height="12" rx="6" fill="#c4b5fd" opacity=".7" />
-      <rect x="208" y="200" width="64" height="12" rx="6" fill="#c4b5fd" opacity=".45" />
-      <circle cx="194" cy="124" r="9" fill="#10b981" />
-      <rect x="204" y="338" width="104" height="10" rx="5" fill="#1a1630" opacity=".45" />
-      <rect x="204" y="362" width="104" height="10" rx="5" fill="#1a1630" opacity=".45" />
+      <path d="M160 137H352C412 137 460 183 460 243C460 302 420 349 368 349C341 349 319 337 301 317H211C193 337 171 349 144 349C92 349 52 302 52 243C52 183 100 137 160 137Z" fill="#939590" transform="translate(0 24)" />
+      <path d="M160 137H352C412 137 460 183 460 243C460 302 420 349 368 349C341 349 319 337 301 317H211C193 337 171 349 144 349C92 349 52 302 52 243C52 183 100 137 160 137Z" fill="#D2D2CE" />
+      <path d="M139 196H165Q171 196 171 202V221H190Q196 221 196 227V253Q196 259 190 259H171V278Q171 284 165 284H139Q133 284 133 278V259H114Q108 259 108 253V227Q108 221 114 221H133V202Q133 196 139 196Z" fill="#303232" />
+      <circle cx="360" cy="202" r="17" fill="#F1C53A" />
+      <circle cx="327" cy="235" r="17" fill="#326FC7" />
+      <circle cx="393" cy="235" r="17" fill="#36A167" />
+      <circle cx="360" cy="268" r="17" fill="#E04B42" />
+      <rect x="219" y="258" width="28" height="10" rx="5" fill="#646762" />
+      <rect x="261" y="258" width="28" height="10" rx="5" fill="#646762" />
     </svg>
   );
 }
