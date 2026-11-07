@@ -59,9 +59,12 @@ RUN set -eu; \
 # ---------- Stage 4: runtime ----------
 FROM docker.io/library/node:${NODE_VERSION}-alpine AS runtime
 
+ARG REPO_URL
 LABEL org.opencontainers.image.title="Retroshelf" \
+      org.opencontainers.image.authors="Giuseppe Rocco" \
+      org.opencontainers.image.licenses="GNU General Public License v3.0" \
       org.opencontainers.image.description="Self-hosted retro game library with in-browser play via EmulatorJS" \
-      org.opencontainers.image.source="https://example.invalid/retroshelf"
+      org.opencontainers.image.source=$REPO_URL
 
 # The base image ships a "node" user on 1000:1000; replace it with an explicit, unprivileged
 # system account so the UID/GID contract is visible here rather than inherited.

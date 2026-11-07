@@ -1,0 +1,44 @@
+name: deploy
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - server/**
+      - shared/**
+      - web/**
+  pull_request:
+    branches:
+      - master
+    paths:
+      - server/**
+      - shared/**
+      - web/**
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Log in to GitHub Container Registry
+      uses: docker/login-action@v2
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Build and push using Podman
+      run: |
+        ACTOR=$(echo "${{ github.actor }}" | tr '[:upper:]' '[:lower:]')
+        SHA=${{ github.sha }}
+        podman build --squash \
+          --build-arg REPO_URL="${{ github.server_url }}/${{ github.repository }}" \
+          -t ghcr.io/$ACTOR/retroshelf:$SHA \
+          -t ghcr.io/$ACTOR/retroshelf:latest \
+          . --file Containerfile
+        podman push ghcr.io/$ACTOR/retroshelf:$SHA
+        podman push ghcr.io/$ACTOR/retroshelf:latest        
