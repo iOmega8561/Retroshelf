@@ -5,7 +5,7 @@ import { downloadHref, fetchGame, playHref } from '../lib/api';
 import type { IndexedGame } from '../lib/filter';
 import { hueFor } from '../lib/format';
 import type { GameDetail, SystemSummary } from '../types';
-import { CartLabel } from './GameGrid';
+import { CartLabel, coverAspect } from './GameGrid';
 import { SavesSection } from './SavesSection';
 
 interface GameDrawerProps {
@@ -121,7 +121,7 @@ export function GameDrawer({ game, system, favorite, onToggleFavorite, onClose, 
 
           <div className="px-6 pb-6 sm:px-8">
             <div className="mx-auto w-44 sm:w-52">
-              <div className="tile-cover shadow-2xl" style={{ aspectRatio: system?.coverAspect ?? 0.75 }}>
+              <div className="tile-cover shadow-2xl" style={{ aspectRatio: coverAspect(game, system) }} data-fit={game.coverAspect ? 'exact' : undefined}>
                 {cover && !coverFailed ? (
                   <img src={cover} alt={t('game.coverAlt', { name: game.name })} onError={() => setCoverFailed(true)} />
                 ) : (

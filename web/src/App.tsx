@@ -228,7 +228,6 @@ export default function App() {
         favorites={favorites}
         density={prefs.density}
         showSystem={shelf.kind !== 'system'}
-        aspect={currentSystem?.coverAspect ?? 0.75}
         onOpen={openGame}
       />
     );

@@ -1,23 +1,17 @@
 @import './tokens.css';
 
 @layer components {
-  .shelf-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(var(--tile-min, 10.5rem), 1fr));
-    gap: 1.75rem 1.25rem;
+  /*
+   * The shelf: rows are laid out by justifyRows() in GameGrid, which gives every tile an exact
+   * width so covers keep their real proportions and each row spans the full width.
+   */
+  .shelf {
+    display: flex;
+    flex-direction: column;
   }
-  .shelf-grid[data-density='compact'] {
-    --tile-min: 7.75rem;
-    gap: 1.25rem 0.875rem;
-  }
-  @media (max-width: 480px) {
-    .shelf-grid {
-      --tile-min: 8.5rem;
-      gap: 1.25rem 0.875rem;
-    }
-    .shelf-grid[data-density='compact'] {
-      --tile-min: 6.25rem;
-    }
+  .shelf-row {
+    display: flex;
+    align-items: flex-start;
   }
 
   /* Off-screen tiles skip layout and paint entirely. */
@@ -41,6 +35,10 @@
     width: 100%;
     height: 100%;
     object-fit: contain;
+  }
+  /* The box already has the image's own aspect ratio, so the art fills it exactly. */
+  .tile-cover[data-fit='exact'] img {
+    object-fit: cover;
   }
   .tile:hover .tile-cover {
     box-shadow: 0 0 0 2px var(--rs-accent-soft), 0 0 0 1px var(--rs-line);

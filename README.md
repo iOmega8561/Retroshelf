@@ -85,7 +85,7 @@ Mount one folder at `/library`, read-only:
 
 **Descriptions in several languages.** Add `<desc lang="en">…</desc>` (or any other language code) next to the usual `<desc>`. Retroshelf shows the one matching the interface language and falls back to the plain `<desc>`, which stays what ES-DE and other frontends display. Genre names from scrapers are shown translated in the Italian interface.
 
-**Artwork** is matched by file name in `covers/`, `screenshots/`, `titlescreens/`, `marquees/`, `fanart/`, `videos/` and `miximages/` (also under `media/` or `downloaded_media/`), so `covers/Advance Wars (USA).png` belongs to `Advance Wars (USA).gba`. Image paths written in the gamelist (`<image>`, `<thumbnail>`, `<marquee>`, …) are used when no matching file exists. Covers are taken from `covers/` first, then `<thumbnail>`, `<image>` and mix images.
+**Artwork** is matched by file name in `covers/`, `screenshots/`, `titlescreens/`, `marquees/`, `fanart/`, `videos/` and `miximages/` (also under `media/` or `downloaded_media/`), so `covers/Advance Wars (USA).png` belongs to `Advance Wars (USA).gba`. Image paths written in the gamelist (`<image>`, `<thumbnail>`, `<marquee>`, …) are used when no matching file exists. Covers are taken from `covers/` first, then `<thumbnail>`, `<image>` and mix images. Each cover is shown with its real proportions: the scan reads every image's dimensions from its header, and the grid lines covers up in justified rows of equal height, so DS boxes, DVD cases and PSP cases sit side by side without cropping or empty bands.
 
 **Disc sets** need no conversion: `.cue` sheets, `.m3u` playlists, `.gdi` and `.ccd` images are grouped with the files they reference, which disappear from the list. Retroshelf streams the whole set to the emulator as one uncompressed ZIP built on the fly, never buffered in memory. CHD or PBP files remain the fastest option for large disc games.
 
@@ -172,7 +172,7 @@ Playable in the browser (EmulatorJS 4.2.3 cores, loaded from `cdn.emulatorjs.org
 | System | Folders | Recommended emulator |
 |---|---|---|
 | Nintendo 3DS | `n3ds`, `3ds` | [Azahar](https://azahar-emu.org/) |
-| GameCube | `gc`, `gamecube` | [Dolphin](https://dolphin-emu.org/) |
+| GameCube | `gc`, `gamecube`, `ngc` | [Dolphin](https://dolphin-emu.org/) |
 | Wii | `wii` | [Dolphin](https://dolphin-emu.org/) |
 | Wii U | `wiiu` | [Cemu](https://cemu.info/) |
 | Nintendo Switch | `switch` | any Switch emulator (keys and firmware from your own console) |
