@@ -62,6 +62,8 @@ export interface GameSummary {
   /** 0..1, as stored by ES-DE. */
   rating?: number;
   cover?: string;
+  /** Real width / height of the cover image, measured by the server, so grids lay out before images load. */
+  coverAspect?: number;
   fileName: string;
   size: number;
   /** Disc set (cue/bin, m3u, gdi, ccd) served as a single archive. */

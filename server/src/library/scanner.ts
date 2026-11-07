@@ -50,6 +50,8 @@ export interface GameRecord {
   rating?: number;
   /** Media paths relative to the system folder. */
   media: Partial<Record<MediaKind, string>>;
+  /** Width / height of the cover image (set by the catalog after measuring it). */
+  coverAspect?: number;
 }
 
 export interface SystemScan {

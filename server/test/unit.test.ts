@@ -8,6 +8,7 @@ import { describe, it } from 'node:test';
 import { parseRange } from '../src/http/send.js';
 import { parseGamelist, parseReleaseDate, sortKey, splitGenres } from '../src/library/gamelist.js';
 import { systemForFolder } from '../src/library/systems.js';
+import { imageSizeFromBuffer } from '../src/util/imagesize.js';
 import { isSafeSegment, normalizeReferencedPath, resolveInside, safeRelativeFromSegments } from '../src/util/paths.js';
 import { buildZipLayout, crc32ForEntries, streamZipRange, zipSize } from '../src/util/zip.js';
 
@@ -40,6 +41,34 @@ describe('system registry', () => {
   it('recognises common folder aliases', () => {
     assert.equal(systemForFolder('ngc').key, 'gc');
     assert.equal(systemForFolder('3ds').key, 'n3ds');
+  });
+});
+
+describe('image size', () => {
+  it('reads dimensions from PNG, JPEG, GIF and WebP headers', () => {
+    const png = Buffer.alloc(24);
+    png.writeUInt32BE(0x89504e47, 0);
+    png.writeUInt32BE(0x0d0a1a0a, 4);
+    png.write('IHDR', 12, 'ascii');
+    png.writeUInt32BE(640, 16);
+    png.writeUInt32BE(480, 20);
+    assert.deepEqual(imageSizeFromBuffer(png), { width: 640, height: 480 });
+
+    // SOI, an APP0 segment to skip, then SOF0 with height 800 and width 600.
+    const jpeg = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10]), Buffer.alloc(14), Buffer.from([0xff, 0xc0, 0x00, 0x11, 0x08, 0x03, 0x20, 0x02, 0x58, 0x03]), Buffer.alloc(16)]);
+    assert.deepEqual(imageSizeFromBuffer(jpeg), { width: 600, height: 800 });
+    assert.equal(imageSizeFromBuffer(jpeg.subarray(0, 12)), 'more');
+
+    const gif = Buffer.from('GIF89a\x64\x00\x32\x00', 'latin1');
+    assert.deepEqual(imageSizeFromBuffer(gif), { width: 100, height: 50 });
+
+    const webp = Buffer.alloc(30);
+    webp.write('RIFF', 0, 'ascii');
+    webp.write('WEBPVP8X', 8, 'ascii');
+    webp.writeUIntLE(1119, 24, 3);
+    webp.writeUIntLE(999, 27, 3);
+    assert.deepEqual(imageSizeFromBuffer(webp), { width: 1120, height: 1000 });
+    assert.equal(imageSizeFromBuffer(Buffer.from('not an image')), null);
   });
 });
 
