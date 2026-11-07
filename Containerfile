@@ -5,7 +5,7 @@
 # whole stack works on networks without internet access.
 #   podman build -t localhost/retroshelf:latest .
 #   podman build --build-arg EMULATORJS_VERSION=4.2.3 -t localhost/retroshelf:latest .   # pin
-# Light image that loads EmulatorJS from its CDN instead: Dockerfile.light
+# Light image that loads EmulatorJS from its CDN instead: Containerfile.light
 #
 ARG NODE_VERSION=22
 

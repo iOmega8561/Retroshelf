@@ -37,7 +37,7 @@ Open <http://localhost:8080>. Over plain HTTP from another device on your LAN, g
 
 ## Two images: full and light
 
-| | `Dockerfile` (tag `latest`) | `Dockerfile.light` (tag `light`) |
+| | `Containerfile` (tag `latest`) | `Containerfile.light` (tag `light`) |
 |---|---|---|
 | EmulatorJS | Bundled: the latest stable release with every core, served by Retroshelf | Loaded by each browser from `cdn.emulatorjs.org/stable` |
 | Image size | About 300 MB larger | Smallest |
@@ -46,7 +46,7 @@ Open <http://localhost:8080>. Over plain HTTP from another device on your LAN, g
 
 ```sh
 podman build -t localhost/retroshelf:latest .                       # full
-podman build -f Dockerfile.light -t localhost/retroshelf:light .    # light
+podman build -f Containerfile.light -t localhost/retroshelf:light .    # light
 ```
 
 **Choosing the EmulatorJS version (full image).**
@@ -327,8 +327,8 @@ web/src/
   play/              player page (framework-free TypeScript + EmulatorJS)
   sw/sw.ts           service worker
 deploy/              Quadlet unit, Caddy / Nginx / Traefik examples
-Dockerfile           full image (EmulatorJS bundled)
-Dockerfile.light     light image (EmulatorJS from the CDN)
+Containerfile           full image (EmulatorJS bundled)
+Containerfile.light     light image (EmulatorJS from the CDN)
 ```
 
 ## Known limits

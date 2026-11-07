@@ -2,8 +2,8 @@
 #
 # Retroshelf, light image: EmulatorJS is loaded by each player's browser from the official CDN
 # (cdn.emulatorjs.org/stable). Smallest image; players need internet access.
-#   podman build -f Dockerfile.light -t localhost/retroshelf:light .
-# Full image with EmulatorJS bundled inside: Dockerfile
+#   podman build -f Containerfile.light -t localhost/retroshelf:light .
+# Full image with EmulatorJS bundled inside: Containerfile
 #
 ARG NODE_VERSION=22
 
