@@ -16,6 +16,7 @@ import type {
 } from '../../../shared/api.js';
 import type { Config } from '../config.js';
 import type { Logger } from '../logger.js';
+import { readImageSize } from '../util/imagesize.js';
 import { stableId } from '../util/mime.js';
 import { encodePath } from '../util/paths.js';
 import { canZip, type ZipEntryInput } from '../util/zip.js';
@@ -63,6 +64,8 @@ export class Catalog {
   private state: CatalogState | null = null;
   private running: Promise<void> | null = null;
   private lastScanStartedAt = 0;
+  /** Cover dimensions survive rescans; only new or changed images are read again. */
+  private coverAspects = new Map<string, { size: number; mtimeMs: number; aspect: number | null }>();
   private timer: NodeJS.Timeout | null = null;
 
   constructor(
@@ -179,6 +182,8 @@ export class Catalog {
     const gamesById = new Map<string, GameRecord>();
     for (const system of systems) for (const game of system.games) gamesById.set(game.id, game);
 
+    await this.measureCovers(systems);
+
     const durationMs = Math.round(performance.now() - started);
     const scannedAt = new Date();
     const summaries = systems.map((s) => this.systemSummary(s));
@@ -210,6 +215,33 @@ export class Catalog {
       ms: durationMs,
       payloadKiB: Math.round(payload.br.length / 1024),
     });
+  }
+
+  /** Reads each cover's header so the UI can show it with its real proportions. */
+  private async measureCovers(systems: SystemRecord[]): Promise<void> {
+    const next = new Map<string, { size: number; mtimeMs: number; aspect: number | null }>();
+    const jobs: Array<() => Promise<void>> = [];
+    for (const system of systems) {
+      for (const game of system.games) {
+        const rel = game.media.cover;
+        if (!rel) continue;
+        const abs = path.join(system.absDir, rel);
+        jobs.push(async () => {
+          const stat = await fs.stat(abs).catch(() => null);
+          if (!stat?.isFile()) return;
+          const cached = this.coverAspects.get(abs);
+          let aspect = cached && cached.size === stat.size && cached.mtimeMs === stat.mtimeMs ? cached.aspect : undefined;
+          if (aspect === undefined) {
+            const size = await readImageSize(abs);
+            aspect = size ? size.width / size.height : null;
+          }
+          next.set(abs, { size: stat.size, mtimeMs: stat.mtimeMs, aspect });
+          if (aspect && aspect >= 0.25 && aspect <= 4) game.coverAspect = Math.round(aspect * 1000) / 1000;
+        });
+      }
+    }
+    for (let i = 0; i < jobs.length; i += 16) await Promise.all(jobs.slice(i, i + 16).map((job) => job()));
+    this.coverAspects = next;
   }
 
   private async encodePayload(payload: LibraryPayload): Promise<EncodedPayload> {
@@ -341,6 +373,7 @@ export class Catalog {
     if (game.rating) summary.rating = game.rating;
     const cover = this.mediaUrl(game.folder, game.media.cover);
     if (cover) summary.cover = cover;
+    if (cover && game.coverAspect) summary.coverAspect = game.coverAspect;
     if (game.files.length > 1) summary.multiFile = true;
     if (game.extras.length) summary.extraCount = game.extras.length;
     if (game.directory) summary.directory = true;

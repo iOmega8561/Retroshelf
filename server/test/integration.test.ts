@@ -158,6 +158,7 @@ describe('catalog', () => {
     const aw = gameByName('Advance Wars');
     assert.equal(aw.year, 2001);
     assert.match(aw.cover ?? '', /^\/media\/gba\/covers\/Advance%20Wars%20\(USA\)\.png$/);
+    assert.equal(aw.coverAspect, 1); // the fixture cover is a 1×1 PNG
   });
 
   it('groups disc sets and hides their members', () => {
