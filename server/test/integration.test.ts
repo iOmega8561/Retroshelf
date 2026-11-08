@@ -29,6 +29,8 @@ function buildFixture(): void {
   write('roms/gba/Advance Wars (USA).gba', Buffer.alloc(4096, 1));
   write('roms/gba/Homebrew_Demo.gba', Buffer.alloc(2048, 2));
   write('roms/gba/notes.txt', 'not a game');
+  write('roms/gba/readme.md', '# not a game either');
+  write('roms/megadrive/Blast Processing.md', Buffer.alloc(512, 24));
   write('roms/gba/covers/Advance Wars (USA).png', PNG);
   write(
     'roms/gba/gamelist.xml',
@@ -148,7 +150,7 @@ describe('catalog', () => {
   it('orders systems by manufacturer and keeps unknown folders as download-only', () => {
     assert.deepEqual(
       library.systems.map((s) => [s.id, s.mode]),
-      [['gba', 'play'], ['n3ds', 'download'], ['switch', 'download'], ['psx', 'play'], ['ps3', 'download'], ['mystery', 'download']],
+      [['nes', 'play'], ['gba', 'play'], ['n3ds', 'download'], ['switch', 'download'], ['psx', 'play'], ['ps3', 'download'], ['megadrive', 'play'], ['mystery', 'download']],
     );
   });
 
@@ -159,6 +161,10 @@ describe('catalog', () => {
     assert.equal(aw.year, 2001);
     assert.match(aw.cover ?? '', /^\/media\/gba\/covers\/Advance%20Wars%20\(USA\)\.png$/);
     assert.equal(aw.coverAspect, 1); // the fixture cover is a 1×1 PNG
+  });
+
+  it('accepts note extensions only where a system uses them (.md Mega Drive ROMs)', () => {
+    assert.deepEqual(library.games.filter((g) => g.system === 'megadrive').map((g) => g.name), ['Blast Processing']);
   });
 
   it('groups disc sets and hides their members', () => {
