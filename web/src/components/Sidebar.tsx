@@ -61,12 +61,12 @@ export function Sidebar(props: SidebarProps) {
 
   return (
     <nav aria-label={t('nav.library')} className="flex h-full flex-col">
-      <div className="flex items-center gap-3 px-5 pb-5 pt-[max(1.5rem,env(safe-area-inset-top))]">
+      <div className="flex items-center gap-3 px-5 pb-4 pt-[max(1.5rem,env(safe-area-inset-top))]">
         <Logo className="size-8 rounded-[9px]" />
         <span className="type-display text-[1.3rem]">Retroshelf</span>
       </div>
 
-      <div className="flex-1 overflow-y-auto overscroll-contain px-3 pb-6">
+      <div className="flex-1 overflow-y-auto overscroll-contain px-3 pb-6 pt-1">
         <div className="space-y-0.5">
           <ShelfButton active={shelf.kind === 'all'} onClick={() => onSelect({ kind: 'all' })}>
             <LibraryBig size={18} aria-hidden /> {t('shelf.all')} {count(props.totalGames)}
