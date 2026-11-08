@@ -55,6 +55,17 @@
     outline: none;
   }
 
+  /*
+   * Focus moved by keyboard or controller scrolls items clear of the sticky toolbar (the Toolbar
+   * keeps its height in --toolbar-height). Not scroll-padding on the page: controls inside the
+   * sticky toolbar would then never count as visible, and every move among them would scroll.
+   */
+  main > header [data-nav],
+  #games [data-nav] {
+    scroll-margin-top: calc(var(--toolbar-height, 0px) + 0.75rem);
+    scroll-margin-bottom: 0.75rem;
+  }
+
   /* Missing cover: a blank cartridge label with the game's name on it. */
   .cart-label {
     position: absolute;

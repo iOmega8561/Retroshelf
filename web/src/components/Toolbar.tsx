@@ -1,5 +1,5 @@
 import { Grid2x2, Grid3x3, Menu, Search } from 'lucide-react';
-import type { RefObject } from 'react';
+import { useLayoutEffect, useRef, type RefObject } from 'react';
 import { useI18n } from '../i18n/react';
 import type { Facets } from '../lib/filter';
 import type { Density, SortKey } from '../lib/store';
@@ -27,8 +27,25 @@ const SORT_KEYS: SortKey[] = ['name', 'name-desc', 'newest', 'oldest', 'rating',
 export function Toolbar(props: ToolbarProps) {
   const i18n = useI18n();
   const { t } = i18n;
+  const bar = useRef<HTMLDivElement>(null);
+
+  // Publish the toolbar's height, so focus scrolling keeps rows clear of it (see app.css).
+  useLayoutEffect(() => {
+    const node = bar.current;
+    if (!node) return;
+    const root = document.documentElement;
+    const update = () => root.style.setProperty('--toolbar-height', `${node.offsetHeight}px`);
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(node, { box: 'border-box' });
+    return () => {
+      observer.disconnect();
+      root.style.removeProperty('--toolbar-height');
+    };
+  }, []);
+
   return (
-    <div className="sticky top-0 z-30 border-b border-line bg-glass pt-[env(safe-area-inset-top)] backdrop-blur-xl backdrop-saturate-150">
+    <div ref={bar} className="sticky top-0 z-30 border-b border-line bg-glass pt-[env(safe-area-inset-top)] backdrop-blur-xl backdrop-saturate-150">
       <div className="flex flex-wrap items-center gap-2 px-4 py-3 sm:px-6 lg:px-8">
         <button type="button" data-nav className="btn-icon lg:hidden" onClick={props.onMenu} aria-label={t('toolbar.showSystems')}>
           <Menu size={20} aria-hidden />
