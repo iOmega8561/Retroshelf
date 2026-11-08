@@ -29,6 +29,7 @@ export const it: Messages = {
   'theme.light': 'Chiaro',
   'language.label': 'Lingua',
   'language.auto': 'Automatica ({name})',
+  'settings.label': 'Impostazioni',
 
   'rescan.button': 'Aggiorna libreria',
   'rescan.running': 'Scansione in corso…',

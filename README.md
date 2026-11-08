@@ -91,7 +91,7 @@ Mount one folder at `/library`, read-only:
 
 **BIOS files** go in `bios/<folder>/`, where `<folder>` is the system's ROM folder name or any of its aliases. Files placed flat in `bios/` (ES-DE style) are picked up when their names match the expected BIOS. A single file is handed to the emulator as-is; several are zipped together on the fly and EmulatorJS extracts them.
 
-After adding files, choose **Rescan library** in the sidebar.
+After adding files, choose **Rescan library** under **Settings** at the bottom of the sidebar.
 
 ## Game folders, updates and DLC
 
@@ -216,7 +216,7 @@ When isolation is missing, PSP and DOS games show a clear notice instead of a br
 The interface is available in English and Italian, including the player, the setup guides for desktop emulators, messages and notices.
 
 - **Automatic choice.** Retroshelf picks the first supported language in the browser's preference list (`navigator.languages`, which follows the system language by default), and falls back to English.
-- **Manual override.** Each device can choose a language in the sidebar; the choice is kept in that browser.
+- **Manual override.** Each device can choose a language under **Settings** at the bottom of the sidebar; the choice is kept in that browser.
 - **Locale-aware formatting.** Numbers, file sizes, dates and relative times follow the active language.
 - **EmulatorJS menus** follow the same language (`EJS_language`). Some EmulatorJS menu entries aren't in its Italian file yet and stay in English.
 - **Installed app.** The PWA manifest description follows the browser's `Accept-Language`.

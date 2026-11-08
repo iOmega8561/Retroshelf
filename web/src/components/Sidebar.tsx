@@ -1,5 +1,5 @@
-import { CircleDashed, Gamepad2, History, Languages, LibraryBig, Monitor, Moon, RefreshCw, Star, Sun } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { ChevronUp, CircleDashed, Gamepad2, History, Languages, LibraryBig, Monitor, Moon, RefreshCw, Settings, Star, Sun } from 'lucide-react';
+import { useId, useState, type ReactNode } from 'react';
 import { controllerName } from '../lib/controllers';
 import { LOCALE_NAMES, LOCALES, type LocalePref } from '../i18n';
 import { useI18n } from '../i18n/react';
@@ -45,6 +45,9 @@ export function Sidebar(props: SidebarProps) {
   const { systems, shelf, onSelect } = props;
   const i18n = useI18n();
   const { t } = i18n;
+  // Theme, language and rescan are rarely needed: keep them folded away so the shelves get the room.
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const settingsId = useId();
   const count = (value: number) => <span className="ml-auto pl-2 text-xs tabular-nums text-muted">{i18n.number(value)}</span>;
 
   const groups = new Map<string, SystemSummary[]>();
@@ -115,51 +118,65 @@ export function Sidebar(props: SidebarProps) {
           </p>
         )}
 
-        <div role="group" aria-label={t('theme.label')} className="flex rounded-lg bg-raised p-1">
-          {themes.map(({ value, label, short, icon: Icon }) => (
-            <button
-              key={value}
-              type="button"
-              data-nav
-              aria-pressed={props.theme === value}
-              title={label}
-              aria-label={label}
-              onClick={() => props.onTheme(value)}
-              className={`flex min-h-9 flex-1 items-center justify-center gap-1.5 rounded-md text-xs font-medium ${
-                props.theme === value ? 'bg-surface text-fg shadow-sm' : 'text-muted hover:text-fg'
-              }`}
-            >
-              <Icon size={15} aria-hidden />
-              <span aria-hidden>{short}</span>
-            </button>
-          ))}
-        </div>
-
-        <label className="flex items-center gap-2">
-          <Languages size={16} aria-hidden className="shrink-0 text-muted" />
-          <span className="sr-only">{t('language.label')}</span>
-          <select
-            data-nav
-            className="field h-9 min-h-0 w-full text-sm"
-            value={props.locale}
-            onChange={(event) => props.onLocale(event.target.value as LocalePref)}
-          >
-            <option value="auto">{t('language.auto', { name: LOCALE_NAMES[i18n.systemLocale] })}</option>
-            {LOCALES.map((locale) => (
-              <option key={locale} value={locale} lang={locale}>
-                {LOCALE_NAMES[locale]}
-              </option>
+        <div id={settingsId} hidden={!settingsOpen} className="space-y-3">
+          <div role="group" aria-label={t('theme.label')} className="flex rounded-lg bg-raised p-1">
+            {themes.map(({ value, label, short, icon: Icon }) => (
+              <button
+                key={value}
+                type="button"
+                data-nav
+                aria-pressed={props.theme === value}
+                title={label}
+                aria-label={label}
+                onClick={() => props.onTheme(value)}
+                className={`flex min-h-9 flex-1 items-center justify-center gap-1.5 rounded-md text-xs font-medium ${
+                  props.theme === value ? 'bg-surface text-fg shadow-sm' : 'text-muted hover:text-fg'
+                }`}
+              >
+                <Icon size={15} aria-hidden />
+                <span aria-hidden>{short}</span>
+              </button>
             ))}
-          </select>
-        </label>
+          </div>
 
-        <div>
-          <button type="button" data-nav className="btn btn-secondary w-full" onClick={props.onRescan} disabled={props.scanning}>
-            <RefreshCw size={16} aria-hidden className={props.scanning ? 'animate-spin-slow' : ''} />
-            {props.scanning ? t('rescan.running') : t('rescan.button')}
-          </button>
-          {props.scannedAt && <p className="mt-2 text-center text-xs text-muted">{t('rescan.last', { time: i18n.relative(Date.parse(props.scannedAt)) })}</p>}
+          <label className="flex items-center gap-2">
+            <Languages size={16} aria-hidden className="shrink-0 text-muted" />
+            <span className="sr-only">{t('language.label')}</span>
+            <select
+              data-nav
+              className="field h-9 min-h-0 w-full text-sm"
+              value={props.locale}
+              onChange={(event) => props.onLocale(event.target.value as LocalePref)}
+            >
+              <option value="auto">{t('language.auto', { name: LOCALE_NAMES[i18n.systemLocale] })}</option>
+              {LOCALES.map((locale) => (
+                <option key={locale} value={locale} lang={locale}>
+                  {LOCALE_NAMES[locale]}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <div>
+            <button type="button" data-nav className="btn btn-secondary w-full" onClick={props.onRescan} disabled={props.scanning}>
+              <RefreshCw size={16} aria-hidden className={props.scanning ? 'animate-spin-slow' : ''} />
+              {props.scanning ? t('rescan.running') : t('rescan.button')}
+            </button>
+            {props.scannedAt && <p className="mt-2 text-center text-xs text-muted">{t('rescan.last', { time: i18n.relative(Date.parse(props.scannedAt)) })}</p>}
+          </div>
         </div>
+
+        <button
+          type="button"
+          data-nav
+          aria-expanded={settingsOpen}
+          aria-controls={settingsId}
+          onClick={() => setSettingsOpen((open) => !open)}
+          className="flex min-h-10 w-full items-center gap-3 rounded-lg px-3 text-left text-[0.9375rem] text-muted transition-colors hover:bg-raised hover:text-fg"
+        >
+          <Settings size={18} aria-hidden /> {t('settings.label')}
+          <ChevronUp size={16} aria-hidden className={`ml-auto transition-transform ${settingsOpen ? 'rotate-180' : ''}`} />
+        </button>
       </footer>
     </nav>
   );
