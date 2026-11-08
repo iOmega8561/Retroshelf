@@ -9,7 +9,7 @@
 # Build the image first (full image, EmulatorJS bundled):
 #   podman build -t localhost/retroshelf:latest .
 # or the light image (EmulatorJS from its CDN) and set Image=localhost/retroshelf:light below:
-#   podman build -f Dockerfile.light -t localhost/retroshelf:light .
+#   podman build -f Containerfile.light -t localhost/retroshelf:light .
 
 [Unit]
 Description=Retroshelf retro game library
