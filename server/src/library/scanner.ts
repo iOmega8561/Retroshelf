@@ -298,7 +298,9 @@ export async function scanSystem(folder: string, absDir: string, def: SystemDef,
   const extraInfo = new Map<string, { ownerDir: string; kind: ExtraKind }>();
   const insideDirectory = new Map<string, string[]>();
   for (const rel of walked.files) {
-    if (rel.normalize('NFC').toLowerCase() === 'gamelist.xml' || NON_ROM_EXTENSIONS.has(extensionOf(rel))) continue;
+    const ext = extensionOf(rel);
+    // Notes and artwork are never games, unless the system uses the extension (".md" is a Mega Drive ROM).
+    if (rel.normalize('NFC').toLowerCase() === 'gamelist.xml' || (NON_ROM_EXTENSIONS.has(ext) && !def.extensions?.includes(ext))) continue;
     const root = directoryOf(rel);
     if (root) {
       insideDirectory.set(root, [...(insideDirectory.get(root) ?? []), rel]);
