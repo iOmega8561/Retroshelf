@@ -106,7 +106,7 @@ export function GameGrid({ games, systems, favorites, density, showSystem, onOpe
 
   return (
     <>
-      <div ref={container} data-nav-scope className="shelf" role="list" aria-label={t('grid.label')} style={{ rowGap: narrow ? 20 : 28 }}>
+      <div ref={container} data-nav-group className="shelf" role="list" aria-label={t('grid.label')} style={{ rowGap: narrow ? 20 : 28 }}>
         {rows.map((row) => (
           <div key={row.start} className="shelf-row" role="presentation" style={{ columnGap: gap }}>
             {shown.slice(row.start, row.end + 1).map((game, offset) => {

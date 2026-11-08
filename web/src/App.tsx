@@ -3,6 +3,7 @@ import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } f
 import { EmptyState } from './components/EmptyState';
 import { GameDrawer } from './components/GameDrawer';
 import { GameGrid, GridSkeleton } from './components/GameGrid';
+import { SelectPicker } from './components/SelectPicker';
 import { ShelfHeader, shelfTitle } from './components/ShelfHeader';
 import { Sidebar } from './components/Sidebar';
 import { useToast } from './components/Toasts';
@@ -33,6 +34,7 @@ export default function App() {
   const { t } = i18n;
   const { scanning, rescan } = useRescan(library.reload, toast);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [picker, setPicker] = useState<HTMLSelectElement | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const openedByPush = useRef(false);
   useTheme(prefs.theme);
@@ -124,6 +126,7 @@ export default function App() {
       if (selected) document.querySelector<HTMLAnchorElement>('[data-play]:not([aria-disabled="true"])')?.click();
     },
     onSearch: () => searchRef.current?.focus(),
+    onPick: setPicker,
   });
 
   // "/" focuses search; arrow keys move between tiles like a controller would.
@@ -136,7 +139,7 @@ export default function App() {
         searchRef.current?.focus();
       } else if (ARROWS[event.key] && target.classList.contains('tile') && !event.altKey && !event.metaKey) {
         event.preventDefault();
-        moveFocus(ARROWS[event.key]!);
+        moveFocus(ARROWS[event.key]!, event.repeat);
       }
     };
     window.addEventListener('keydown', onKey);
@@ -296,6 +299,8 @@ export default function App() {
           toast={toast}
         />
       )}
+
+      {picker && <SelectPicker select={picker} onClose={() => setPicker(null)} />}
     </div>
   );
 }

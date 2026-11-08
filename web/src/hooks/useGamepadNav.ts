@@ -2,8 +2,9 @@ import { useEffect, useRef } from 'react';
 
 /**
  * Couch-friendly navigation for the library with any standard-mapped controller:
- * D-pad / left stick moves focus spatially, A activates, B goes back,
- * LB/RB switch shelves, Start plays the open game, Y focuses search.
+ * D-pad / left stick moves focus spatially, A activates (on a select it opens a picker),
+ * B goes back or closes an open popover, LB/RB switch shelves, Start plays the open game,
+ * Y focuses search.
  */
 
 export type Direction = 'up' | 'down' | 'left' | 'right';
@@ -13,6 +14,8 @@ export interface GamepadNavHandlers {
   onShelfStep(step: -1 | 1): void;
   onStart(): void;
   onSearch(): void;
+  /** A on a native <select>: a controller can neither open nor drive the browser's own picker. */
+  onPick(select: HTMLSelectElement): void;
 }
 
 const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -23,13 +26,62 @@ function isVisible(element: HTMLElement): boolean {
   return rect.width > 0 && rect.height > 0 && element.getClientRects().length > 0;
 }
 
-/** Topmost open scope (a dialog marks itself with data-nav-scope), else the document. */
+function isOpenPopover(element: HTMLElement): boolean {
+  try {
+    return element.matches(':popover-open');
+  } catch {
+    return false; // no Popover API
+  }
+}
+
+/**
+ * Topmost open scope (dialogs and popovers mark themselves with data-nav-scope), else the document.
+ * A closed popover keeps its markup in the DOM, so only scopes that are actually rendered count.
+ */
 function activeScope(): ParentNode {
-  const scopes = document.querySelectorAll<HTMLElement>('[data-nav-scope]');
+  const scopes = Array.from(document.querySelectorAll<HTMLElement>('[data-nav-scope]')).filter((scope) => scope.getClientRects().length > 0);
   return scopes.length ? scopes[scopes.length - 1]! : document;
 }
 
-export function moveFocus(direction: Direction): void {
+/**
+ * Closest candidate in a direction: distance along it, plus a penalty for drifting across it.
+ * Strictly, a candidate's centre must lie beyond the current element's edge; comparing centres
+ * only, a wide search field would see the games below it as being to its left, and the first game
+ * of a row would see a narrower one in the next row as being to its left too.
+ */
+function nearest(from: DOMRect, candidates: HTMLElement[], direction: Direction, strict: boolean): HTMLElement | undefined {
+  const cx = from.left + from.width / 2;
+  const cy = from.top + from.height / 2;
+  let best: HTMLElement | undefined;
+  let bestScore = Number.POSITIVE_INFINITY;
+
+  for (const element of candidates) {
+    const rect = element.getBoundingClientRect();
+    const x = rect.left + rect.width / 2;
+    const y = rect.top + rect.height / 2;
+    const dx = x - cx;
+    const dy = y - cy;
+    const primary = direction === 'up' ? -dy : direction === 'down' ? dy : direction === 'left' ? -dx : dx;
+    const cross = direction === 'up' || direction === 'down' ? Math.abs(dx) : Math.abs(dy);
+    const beyond = direction === 'up' ? y < from.top : direction === 'down' ? y > from.bottom : direction === 'left' ? x < from.left : x > from.right;
+    if (strict ? !beyond : primary <= 4) continue;
+    const score = primary + cross * 2.5;
+    if (score < bestScore) {
+      bestScore = score;
+      best = element;
+    }
+  }
+  return best;
+}
+
+/**
+ * Moves focus to the closest control in a direction. Inside a navigation group (the game grid,
+ * data-nav-group) left/right never leave the group, and up/down leave it only on a fresh press:
+ * holding a direction stops at the group's edge instead of overshooting into the toolbar or the
+ * sidebar, whose sticky positions don't follow the page. Outside the grid, when nothing lies
+ * strictly in that direction (say, a row scrolled partly under the sticky toolbar), centres decide.
+ */
+export function moveFocus(direction: Direction, repeat = false): void {
   const scope = activeScope();
   const candidates = Array.from(scope.querySelectorAll<HTMLElement>('[data-nav]')).filter(isVisible);
   const current = document.activeElement as HTMLElement | null;
@@ -39,30 +91,19 @@ export function moveFocus(direction: Direction): void {
   };
 
   if (!current || !current.matches('[data-nav]') || !(scope as Node).contains(current)) {
-    const first = candidates.find((el) => el.classList.contains('tile')) ?? candidates[0];
+    // Start in the content: the first game, else an empty state's action, else anything.
+    const first = candidates.find((el) => el.classList.contains('tile')) ?? candidates.find((el) => el.closest('#games')) ?? candidates[0];
     if (first) focus(first);
     return;
   }
 
   const from = current.getBoundingClientRect();
-  const cx = from.left + from.width / 2;
-  const cy = from.top + from.height / 2;
-  let best: HTMLElement | undefined;
-  let bestScore = Number.POSITIVE_INFINITY;
-
-  for (const element of candidates) {
-    if (element === current) continue;
-    const rect = element.getBoundingClientRect();
-    const dx = rect.left + rect.width / 2 - cx;
-    const dy = rect.top + rect.height / 2 - cy;
-    const primary = direction === 'up' ? -dy : direction === 'down' ? dy : direction === 'left' ? -dx : dx;
-    const cross = direction === 'up' || direction === 'down' ? Math.abs(dx) : Math.abs(dy);
-    if (primary <= 4) continue;
-    const score = primary + cross * 2.5;
-    if (score < bestScore) {
-      bestScore = score;
-      best = element;
-    }
+  const others = candidates.filter((el) => el !== current);
+  const group = current.closest<HTMLElement>('[data-nav-group]');
+  const outside = group ? others.filter((el) => !group.contains(el)) : others;
+  let best = group ? nearest(from, others.filter((el) => group.contains(el)), direction, true) : undefined;
+  if (!best && (!group || (!repeat && (direction === 'up' || direction === 'down')))) {
+    best = nearest(from, outside, direction, true) ?? nearest(from, outside, direction, false);
   }
   if (best) focus(best);
 }
@@ -81,24 +122,30 @@ export function useGamepadNav(enabled: boolean, handlers: GamepadNavHandlers): v
     const held = new Map<string, number>();
     let frame = 0;
 
-    const fire = (control: string) => {
+    const fire = (control: string, repeat: boolean) => {
       root.dataset.input = 'gamepad';
       switch (control) {
         case 'up':
         case 'down':
         case 'left':
         case 'right':
-          moveFocus(control);
+          moveFocus(control, repeat);
           break;
         case 'a': {
           const active = document.activeElement as HTMLElement | null;
-          if (active && active !== document.body) active.click();
+          if (active instanceof HTMLSelectElement) latest.current.onPick(active);
+          else if (active && active !== document.body) active.click();
           else moveFocus('down');
           break;
         }
-        case 'b':
-          latest.current.onBack();
+        case 'b': {
+          // An open popover (genre filter, select picker) closes first; the browser then returns
+          // focus to whatever opened it.
+          const popover = Array.from(document.querySelectorAll<HTMLElement>('[popover]')).filter(isOpenPopover).pop();
+          if (popover) popover.hidePopover();
+          else latest.current.onBack();
           break;
+        }
         case 'lb':
           latest.current.onShelfStep(-1);
           break;
@@ -140,10 +187,10 @@ export function useGamepadNav(enabled: boolean, handlers: GamepadNavHandlers): v
         const repeats = control === 'up' || control === 'down' || control === 'left' || control === 'right';
         if (next === undefined) {
           held.set(control, time + REPEAT_DELAY);
-          fire(control);
+          fire(control, false);
         } else if (repeats && time >= next) {
           held.set(control, time + REPEAT_RATE);
-          fire(control);
+          fire(control, true);
         }
       }
     };
