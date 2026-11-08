@@ -2,9 +2,8 @@ import { useEffect, useRef } from 'react';
 
 /**
  * Couch-friendly navigation for the library with any standard-mapped controller:
- * D-pad / left stick moves focus spatially, A activates (on a select it opens a picker),
- * B goes back or closes an open popover, LB/RB switch shelves, Start plays the open game,
- * Y focuses search.
+ * D-pad / left stick moves focus spatially, A activates, B goes back or closes an open popover,
+ * LB/RB switch shelves, Start plays the open game, Y focuses search.
  */
 
 export type Direction = 'up' | 'down' | 'left' | 'right';
@@ -14,8 +13,6 @@ export interface GamepadNavHandlers {
   onShelfStep(step: -1 | 1): void;
   onStart(): void;
   onSearch(): void;
-  /** A on a native <select>: a controller can neither open nor drive the browser's own picker. */
-  onPick(select: HTMLSelectElement): void;
 }
 
 const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -133,13 +130,12 @@ export function useGamepadNav(enabled: boolean, handlers: GamepadNavHandlers): v
           break;
         case 'a': {
           const active = document.activeElement as HTMLElement | null;
-          if (active instanceof HTMLSelectElement) latest.current.onPick(active);
-          else if (active && active !== document.body) active.click();
+          if (active && active !== document.body) active.click();
           else moveFocus('down');
           break;
         }
         case 'b': {
-          // An open popover (genre filter, select picker) closes first; the browser then returns
+          // An open popover (a picker) closes first; the browser then returns
           // focus to whatever opened it.
           const popover = Array.from(document.querySelectorAll<HTMLElement>('[popover]')).filter(isOpenPopover).pop();
           if (popover) popover.hidePopover();

@@ -4,6 +4,7 @@ import { useI18n } from '../i18n/react';
 import type { Facets } from '../lib/filter';
 import type { Density, SortKey } from '../lib/store';
 import { GenreFilter } from './GenreFilter';
+import { Picker } from './Picker';
 
 interface ToolbarProps {
   searchRef: RefObject<HTMLInputElement | null>;
@@ -72,39 +73,31 @@ export function Toolbar(props: ToolbarProps) {
         </label>
 
         <div className="-mx-1 flex w-full items-center gap-2 overflow-x-auto px-1 md:mx-0 md:w-auto md:overflow-visible md:px-0">
-          <select
-            data-nav
-            className="field shrink-0"
+          <Picker
+            label={t('toolbar.sortLabel')}
+            options={SORT_KEYS.map((key) => ({ value: key, label: t(`sort.${key}`) }))}
             value={props.sort}
+            onChange={(value) => props.onSort(value as SortKey)}
             disabled={props.sortLocked}
-            onChange={(event) => props.onSort(event.target.value as SortKey)}
-            aria-label={t('toolbar.sortLabel')}
             title={props.sortLocked ? t('toolbar.sortLocked') : undefined}
-          >
-            {SORT_KEYS.map((key) => (
-              <option key={key} value={key}>
-                {t(`sort.${key}`)}
-              </option>
-            ))}
-          </select>
+          />
 
           <GenreFilter options={props.facets.genres} selected={props.genres} onChange={props.onGenres} />
 
-          <select
-            data-nav
-            className="field shrink-0"
-            value={props.decade ?? ''}
+          <Picker
+            label={t('toolbar.decadeLabel')}
+            options={[
+              { value: '', label: t('toolbar.anyYear') },
+              ...props.facets.decades.map(({ decade, count }) => ({
+                value: String(decade),
+                label: t('decade', { decade: String(decade) }),
+                detail: i18n.number(count),
+              })),
+            ]}
+            value={props.decade === null ? '' : String(props.decade)}
+            onChange={(value) => props.onDecade(value ? Number(value) : null)}
             disabled={!props.facets.decades.length}
-            onChange={(event) => props.onDecade(event.target.value ? Number(event.target.value) : null)}
-            aria-label={t('toolbar.decadeLabel')}
-          >
-            <option value="">{t('toolbar.anyYear')}</option>
-            {props.facets.decades.map(({ decade, count }) => (
-              <option key={decade} value={decade}>
-                {t('toolbar.decadeOption', { decade: t('decade', { decade: String(decade) }), count })}
-              </option>
-            ))}
-          </select>
+          />
 
           <button
             type="button"

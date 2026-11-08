@@ -48,7 +48,6 @@ export const it: Messages = {
   'toolbar.sortLocked': 'I giochi recenti sono sempre ordinati per ultima partita',
   'toolbar.decadeLabel': 'Decennio di uscita',
   'toolbar.anyYear': 'Qualsiasi anno',
-  'toolbar.decadeOption': '{decade} ({count})',
   'toolbar.compact': 'Griglia compatta',
   decade: 'Anni {decade}',
   'sort.name': 'Nome, dalla A alla Z',

@@ -50,7 +50,6 @@ export const en = {
   'toolbar.sortLocked': 'Recently played is always sorted by last played',
   'toolbar.decadeLabel': 'Release decade',
   'toolbar.anyYear': 'Any year',
-  'toolbar.decadeOption': '{decade} ({count})',
   'toolbar.compact': 'Compact grid',
   decade: '{decade}s',
   'sort.name': 'Name, A to Z',

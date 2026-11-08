@@ -7,6 +7,7 @@ import type { Shelf } from '../lib/filter';
 import type { ThemePref } from '../lib/store';
 import type { SystemSummary } from '../types';
 import { Logo } from './Logo';
+import { Picker } from './Picker';
 
 interface SidebarProps {
   systems: SystemSummary[];
@@ -139,23 +140,19 @@ export function Sidebar(props: SidebarProps) {
             ))}
           </div>
 
-          <label className="flex items-center gap-2">
+          <div className="flex items-center gap-2">
             <Languages size={16} aria-hidden className="shrink-0 text-muted" />
-            <span className="sr-only">{t('language.label')}</span>
-            <select
-              data-nav
-              className="field h-9 min-h-0 w-full text-sm"
+            <Picker
+              label={t('language.label')}
+              options={[
+                { value: 'auto', label: t('language.auto', { name: LOCALE_NAMES[i18n.systemLocale] }) },
+                ...LOCALES.map((locale) => ({ value: locale, label: LOCALE_NAMES[locale], lang: locale })),
+              ]}
               value={props.locale}
-              onChange={(event) => props.onLocale(event.target.value as LocalePref)}
-            >
-              <option value="auto">{t('language.auto', { name: LOCALE_NAMES[i18n.systemLocale] })}</option>
-              {LOCALES.map((locale) => (
-                <option key={locale} value={locale} lang={locale}>
-                  {LOCALE_NAMES[locale]}
-                </option>
-              ))}
-            </select>
-          </label>
+              onChange={(value) => props.onLocale(value as LocalePref)}
+              className="h-9 min-h-0 w-full text-sm"
+            />
+          </div>
 
           <div>
             <button type="button" data-nav className="btn btn-secondary w-full" onClick={props.onRescan} disabled={props.scanning}>
