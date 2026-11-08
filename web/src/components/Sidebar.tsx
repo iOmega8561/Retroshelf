@@ -1,4 +1,4 @@
-import { ChevronUp, CircleDashed, Gamepad2, History, Languages, LibraryBig, Monitor, Moon, RefreshCw, Settings, Star, Sun } from 'lucide-react';
+import { ChevronUp, CircleDashed, Gamepad2, History, LibraryBig, Monitor, Moon, RefreshCw, Settings, Star, Sun } from 'lucide-react';
 import { useId, useState, type ReactNode } from 'react';
 import { controllerName } from '../lib/controllers';
 import { LOCALE_NAMES, LOCALES, type LocalePref } from '../i18n';
@@ -140,19 +140,16 @@ export function Sidebar(props: SidebarProps) {
             ))}
           </div>
 
-          <div className="flex items-center gap-2">
-            <Languages size={16} aria-hidden className="shrink-0 text-muted" />
-            <Picker
-              label={t('language.label')}
-              options={[
-                { value: 'auto', label: t('language.auto', { name: LOCALE_NAMES[i18n.systemLocale] }) },
-                ...LOCALES.map((locale) => ({ value: locale, label: LOCALE_NAMES[locale], lang: locale })),
-              ]}
-              value={props.locale}
-              onChange={(value) => props.onLocale(value as LocalePref)}
-              className="h-9 min-h-0 w-full text-sm"
-            />
-          </div>
+          <Picker
+            label={t('language.label')}
+            options={[
+              { value: 'auto', label: t('language.auto', { name: LOCALE_NAMES[i18n.systemLocale] }) },
+              ...LOCALES.map((locale) => ({ value: locale, label: LOCALE_NAMES[locale], lang: locale })),
+            ]}
+            value={props.locale}
+            onChange={(value) => props.onLocale(value as LocalePref)}
+            className="h-9 min-h-0 w-full text-sm"
+          />
 
           <div>
             <button type="button" data-nav className="btn btn-secondary w-full" onClick={props.onRescan} disabled={props.scanning}>
