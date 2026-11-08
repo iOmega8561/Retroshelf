@@ -339,4 +339,3 @@ Containerfile.light     light image (EmulatorJS from the CDN)
 - On `localhost`, EmulatorJS checks its CDN for updates; with the bundled copy, the player's CSP blocks that request (it shows as a console warning). On any other hostname the check doesn't run.
 - Controllers need HTTPS (or localhost) and appear after their first button press. In the library, the D-pad moves between games and, from the top row, up to the filters and the toolbar. A opens a game or uses the focused control (sort, decade and language open a list to pick from), B goes back or closes a menu, Y jumps to search, LB/RB switch systems and Start plays.
 - Some browsers keep game audio muted until the first key press or tap on the player page.
-- Folders that ES-DE treats as a single game (for example a `Game.ps3` folder) aren't supported; only files are listed as games.
