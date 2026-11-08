@@ -31,6 +31,7 @@ export const en = {
   'theme.light': 'Light',
   'language.label': 'Language',
   'language.auto': 'Automatic ({name})',
+  'settings.label': 'Settings',
 
   'rescan.button': 'Rescan library',
   'rescan.running': 'Scanning…',
